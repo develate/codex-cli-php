@@ -1,0 +1,34 @@
+{
+    "name": "develate/codex-cli-php",
+    "description": "A small, resilient PHP SDK for controlling the Codex CLI and app server.",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Develate\\CodexCli\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Develate\\CodexCli\\Tests\\": "tests/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Thorsten"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "symfony/process": "^7.2"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5"
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
