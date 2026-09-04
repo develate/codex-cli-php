@@ -47,6 +47,26 @@ final class AppServerClient
         return is_array($result) ? $result : [];
     }
 
+    /** @return array<string, mixed> */
+    public function consumeRateLimitResetCredit(string $idempotencyKey, ?string $creditId = null): array
+    {
+        if (trim($idempotencyKey) === '') {
+            throw new \InvalidArgumentException('The idempotency key must not be empty.');
+        }
+
+        if ($creditId !== null && trim($creditId) === '') {
+            throw new \InvalidArgumentException('The credit ID must not be empty when provided.');
+        }
+
+        $this->initialize();
+        $result = $this->connection->request('account/rateLimitResetCredit/consume', array_filter([
+            'idempotencyKey' => $idempotencyKey,
+            'creditId' => $creditId,
+        ], static fn (mixed $value): bool => $value !== null));
+
+        return is_array($result) ? $result : [];
+    }
+
     /** @param callable(Notification): void $listener */
     public function onNotification(callable $listener): void
     {

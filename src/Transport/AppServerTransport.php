@@ -8,6 +8,8 @@ use Develate\CodexCli\AppServer\AppServerClient;
 use Develate\CodexCli\AppServer\JsonRpcConnection;
 use Develate\CodexCli\AppServer\QuotaMapper;
 use Develate\CodexCli\Value\Account;
+use Develate\CodexCli\Value\ConsumeRateLimitResetCreditOutcome;
+use Develate\CodexCli\Value\ConsumeRateLimitResetCreditResult;
 use Develate\CodexCli\Value\Quota;
 
 final class AppServerTransport
@@ -37,6 +39,20 @@ final class AppServerTransport
                 requiresOpenaiAuth: (bool) ($response['requiresOpenaiAuth'] ?? false),
                 raw: $response,
             );
+        });
+    }
+
+    public function consumeRateLimitResetCredit(string $idempotencyKey, ?string $creditId = null): ConsumeRateLimitResetCreditResult
+    {
+        return $this->withClient(function (AppServerClient $client) use ($idempotencyKey, $creditId): ConsumeRateLimitResetCreditResult {
+            $response = $client->consumeRateLimitResetCredit($idempotencyKey, $creditId);
+            $outcome = $response['outcome'] ?? null;
+
+            if (! is_string($outcome) || ($typedOutcome = ConsumeRateLimitResetCreditOutcome::tryFrom($outcome)) === null) {
+                throw new \RuntimeException('Codex returned an unknown rate-limit reset-credit outcome.');
+            }
+
+            return new ConsumeRateLimitResetCreditResult($typedOutcome);
         });
     }
 

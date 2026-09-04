@@ -12,6 +12,7 @@ use Develate\CodexCli\Transport\ExecTransport;
 use Develate\CodexCli\Transport\RunMode;
 use Develate\CodexCli\Transport\Transport;
 use Develate\CodexCli\Value\Account;
+use Develate\CodexCli\Value\ConsumeRateLimitResetCreditResult;
 use Develate\CodexCli\Value\Quota;
 use Develate\CodexCli\Value\Sandbox;
 use Symfony\Component\Process\Exception\ProcessFailedException as SymfonyProcessFailed;
@@ -103,6 +104,11 @@ final class Codex
     public function account(): Account
     {
         return $this->appServerTransport->account();
+    }
+
+    public function consumeRateLimitResetCredit(string $idempotencyKey, ?string $creditId = null): ConsumeRateLimitResetCreditResult
+    {
+        return $this->appServerTransport->consumeRateLimitResetCredit($idempotencyKey, $creditId);
     }
 
     public function version(): string

@@ -15,6 +15,7 @@ final readonly class Quota
         public ?QuotaWindow $secondary,
         public array $additional,
         public ?Credits $credits,
+        public ?RateLimitResetCredits $resetCredits,
         public array $raw = [],
     ) {
     }

@@ -7,6 +7,8 @@ namespace Develate\CodexCli\AppServer;
 use Develate\CodexCli\Value\Credits;
 use Develate\CodexCli\Value\Quota;
 use Develate\CodexCli\Value\QuotaWindow;
+use Develate\CodexCli\Value\RateLimitResetCredit;
+use Develate\CodexCli\Value\RateLimitResetCredits;
 
 final class QuotaMapper
 {
@@ -29,6 +31,7 @@ final class QuotaMapper
             secondary: $this->window($snapshot['secondary'] ?? null),
             additional: $additional,
             credits: $this->credits($snapshot['credits'] ?? null),
+            resetCredits: $this->resetCredits($response['rateLimitResetCredits'] ?? null),
             raw: $response,
         );
     }
@@ -41,6 +44,7 @@ final class QuotaMapper
             secondary: $this->window($snapshot['secondary'] ?? null),
             additional: [],
             credits: $this->credits($snapshot['credits'] ?? null),
+            resetCredits: null,
             raw: $snapshot,
         );
     }
@@ -73,5 +77,54 @@ final class QuotaMapper
             balance: isset($value['balance']) && is_scalar($value['balance']) ? (string) $value['balance'] : null,
             raw: $value,
         );
+    }
+
+    private function resetCredits(mixed $value): ?RateLimitResetCredits
+    {
+        if (! is_array($value)) {
+            return null;
+        }
+
+        $credits = null;
+
+        if (is_array($value['credits'] ?? null)) {
+            $credits = [];
+
+            foreach ($value['credits'] as $credit) {
+                if (! is_array($credit)) {
+                    continue;
+                }
+
+                $id = $credit['id'] ?? null;
+                $status = $credit['status'] ?? null;
+                $resetType = $credit['resetType'] ?? null;
+                $grantedAt = $this->timestamp($credit['grantedAt'] ?? null);
+
+                if (! is_string($id) || $id === ''
+                    || ! is_string($status) || $status === ''
+                    || ! is_string($resetType) || $resetType === ''
+                    || $grantedAt === null) {
+                    continue;
+                }
+
+                $credits[] = new RateLimitResetCredit(
+                    id: $id,
+                    status: $status,
+                    resetType: $resetType,
+                    grantedAt: $grantedAt,
+                    expiresAt: $this->timestamp($credit['expiresAt'] ?? null),
+                );
+            }
+        }
+
+        return new RateLimitResetCredits(
+            availableCount: is_numeric($value['availableCount'] ?? null) ? max(0, (int) $value['availableCount']) : 0,
+            credits: $credits,
+        );
+    }
+
+    private function timestamp(mixed $value): ?\DateTimeImmutable
+    {
+        return is_numeric($value) ? new \DateTimeImmutable('@'.(int) $value) : null;
     }
 }
