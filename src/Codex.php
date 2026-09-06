@@ -8,6 +8,7 @@ use Develate\CodexCli\Exception\CodexNotFound;
 use Develate\CodexCli\Exception\ProcessFailed;
 use Develate\CodexCli\Process\CodexExecutable;
 use Develate\CodexCli\Transport\AppServerTransport;
+use Develate\CodexCli\Transport\AppServerTurnTransport;
 use Develate\CodexCli\Transport\ExecTransport;
 use Develate\CodexCli\Transport\RunMode;
 use Develate\CodexCli\Transport\Transport;
@@ -23,6 +24,7 @@ final class Codex
 {
     private readonly Transport $execTransport;
     private readonly AppServerTransport $appServerTransport;
+    private readonly ?AppServerTurnTransport $turnTransport;
     private ?string $versionCache = null;
     private ?string $defaultCwd = null;
     private Sandbox $defaultSandbox = Sandbox::ReadOnly;
@@ -32,9 +34,29 @@ final class Codex
         ?Transport $execTransport = null,
         ?AppServerTransport $appServerTransport = null,
         private readonly ?float $timeout = null,
+        ?AppServerTurnTransport $turnTransport = null,
     ) {
         $this->execTransport = $execTransport ?? new ExecTransport($binary);
         $this->appServerTransport = $appServerTransport ?? new AppServerTransport($binary);
+        $this->turnTransport = $turnTransport;
+    }
+
+    /**
+     * Whether turns can be driven interactively, so the agent is able to stop
+     * and ask rather than deciding on its own.
+     */
+    public function supportsInteractiveTurns(): bool
+    {
+        return $this->turnTransport !== null;
+    }
+
+    /**
+     * The transport an interactive turn runs on, so the caller can register how
+     * approvals are answered before starting one.
+     */
+    public function turnTransport(): ?AppServerTurnTransport
+    {
+        return $this->turnTransport;
     }
 
     /**
@@ -45,9 +67,10 @@ final class Codex
         ?string $model = null,
         ?Sandbox $sandbox = null,
         array $writableDirectories = [],
+        bool $interactive = false,
     ): Thread {
         return new Thread(
-            transport: $this->execTransport,
+            transport: $this->transportFor($interactive),
             codexVersion: $this->version(),
             cwd: $this->resolveCwd($cwd),
             model: $model,
@@ -57,10 +80,10 @@ final class Codex
         );
     }
 
-    public function resume(string $id, ?string $cwd = null, ?string $model = null): Thread
+    public function resume(string $id, ?string $cwd = null, ?string $model = null, bool $interactive = false): Thread
     {
         return new Thread(
-            transport: $this->execTransport,
+            transport: $this->transportFor($interactive),
             codexVersion: $this->version(),
             cwd: $this->resolveCwd($cwd),
             model: $model,
@@ -133,6 +156,19 @@ final class Codex
         }
 
         return $this->versionCache = $output;
+    }
+
+    /**
+     * Interactive turns fall back to `codex exec` rather than failing when the
+     * installed CLI has no app-server turn support: the turn still runs, and
+     * the caller has already been told through {@see self::supportsInteractiveTurns()}
+     * that approvals will not be possible.
+     */
+    private function transportFor(bool $interactive): Transport
+    {
+        return $interactive && $this->turnTransport !== null
+            ? $this->turnTransport
+            : $this->execTransport;
     }
 
     private function resolveCwd(?string $cwd): string

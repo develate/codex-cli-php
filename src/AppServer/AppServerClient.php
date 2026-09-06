@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Develate\CodexCli\AppServer;
 
+use Develate\CodexCli\Exception\AppServerException;
+
 final class AppServerClient
 {
     private bool $initialized = false;
@@ -67,9 +69,106 @@ final class AppServerClient
         return is_array($result) ? $result : [];
     }
 
+    /**
+     * Opens a fresh thread and returns its ID.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    public function threadStart(array $params): string
+    {
+        $this->initialize();
+        $result = $this->connection->request('thread/start', $params);
+        $thread = is_array($result) ? ($result['thread'] ?? null) : null;
+        $id = is_array($thread) ? ($thread['id'] ?? null) : null;
+
+        if (!is_string($id) || $id === '') {
+            throw new AppServerException('The Codex app server started a thread without naming it.');
+        }
+
+        return $id;
+    }
+
+    /**
+     * Rejoins an existing thread.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    public function threadResume(string $threadId, array $params = []): string
+    {
+        $this->initialize();
+        $result = $this->connection->request('thread/resume', array_merge([
+            'threadId' => $threadId,
+
+            // The history is already on disk and the caller does not read it
+            // back through this call, so hydrating every turn only makes the
+            // response large.
+            'excludeTurns' => true,
+        ], $params));
+
+        $thread = is_array($result) ? ($result['thread'] ?? null) : null;
+        $id = is_array($thread) ? ($thread['id'] ?? null) : null;
+
+        return is_string($id) && $id !== '' ? $id : $threadId;
+    }
+
+    /**
+     * Starts a turn and returns its ID. The work itself arrives as
+     * notifications afterwards.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    public function turnStart(array $params): string
+    {
+        $result = $this->connection->request('turn/start', $params);
+        $turn = is_array($result) ? ($result['turn'] ?? null) : null;
+        $id = is_array($turn) ? ($turn['id'] ?? null) : null;
+
+        if (!is_string($id) || $id === '') {
+            throw new AppServerException('The Codex app server started a turn without naming it.');
+        }
+
+        return $id;
+    }
+
+    /**
+     * Asks the agent to stop.
+     *
+     * Sent on a best-effort basis: the turn may have finished between the
+     * decision to cancel and this call, and a server that no longer knows the
+     * turn is not an error worth surfacing.
+     */
+    public function turnInterrupt(string $threadId, string $turnId): void
+    {
+        try {
+            $this->connection->request('turn/interrupt', [
+                'threadId' => $threadId,
+                'turnId' => $turnId,
+            ], timeout: 5.0);
+        } catch (\Throwable) {
+            // Nothing left to interrupt.
+        }
+    }
+
     /** @param callable(Notification): void $listener */
     public function onNotification(callable $listener): void
     {
         $this->connection->onNotification($listener);
+    }
+
+    /** @param callable(ServerRequest): array<string, mixed> $handler */
+    public function onServerRequest(callable $handler): void
+    {
+        $this->connection->onServerRequest($handler);
+    }
+
+    public function pump(float $timeout): bool
+    {
+        return $this->connection->pump($timeout);
+    }
+
+    /** @return list<Notification> */
+    public function drain(): array
+    {
+        return $this->connection->drain();
     }
 }

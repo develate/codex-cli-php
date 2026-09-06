@@ -22,6 +22,12 @@ final class JsonRpcConnection
     /** @var list<callable(Notification): void> */
     private array $notificationListeners = [];
 
+    /** @var (callable(ServerRequest): array<string, mixed>)|null */
+    private $serverRequestHandler = null;
+
+    /** @var list<Notification> */
+    private array $inbox = [];
+
     public function __construct(
         private readonly string $binary = 'codex',
         private readonly float $timeout = 10.0,
@@ -52,16 +58,15 @@ final class JsonRpcConnection
     }
 
     /** @param array<string, mixed>|null $params */
-    public function request(string $method, ?array $params = null): mixed
+    public function request(string $method, ?array $params = null, ?float $timeout = null): mixed
     {
         $this->connect();
         $request = new Request($this->nextId++, $method, $params);
         $this->write($request->toArray());
 
         while (true) {
-            $message = $this->read();
-            if (isset($message['method']) && !isset($message['id'])) {
-                $this->dispatchNotification($message);
+            $message = $this->read($timeout);
+            if ($this->handleIncoming($message)) {
                 continue;
             }
             if (($message['id'] ?? null) !== $request->id) {
@@ -101,6 +106,113 @@ final class JsonRpcConnection
     public function onNotification(callable $listener): void
     {
         $this->notificationListeners[] = $listener;
+    }
+
+    /**
+     * Registers the answer to requests the server sends us.
+     *
+     * The handler returns the JSON-RPC result. Throwing from it turns into an
+     * error response rather than silence, because a server request nobody
+     * replies to leaves the agent waiting for the rest of the turn.
+     *
+     * @param callable(ServerRequest): array<string, mixed> $handler
+     */
+    public function onServerRequest(callable $handler): void
+    {
+        $this->serverRequestHandler = $handler;
+    }
+
+    /**
+     * Waits for one message and files it, without expecting a response.
+     *
+     * This is what lets a turn stream: notifications pile up in the inbox and
+     * server requests are answered as they arrive, while the caller decides how
+     * long to keep listening.
+     *
+     * @return bool whether a message arrived before the timeout
+     */
+    public function pump(float $timeout): bool
+    {
+        $this->connect();
+
+        try {
+            $message = $this->read($timeout);
+        } catch (AppServerException $exception) {
+            // A timeout is a normal outcome here: the agent may simply be
+            // thinking. Anything else is a real transport failure.
+            if (str_contains($exception->getMessage(), 'did not respond within')) {
+                return false;
+            }
+
+            throw $exception;
+        }
+
+        $this->handleIncoming($message);
+
+        return true;
+    }
+
+    /**
+     * Takes everything received so far, oldest first.
+     *
+     * @return list<Notification>
+     */
+    public function drain(): array
+    {
+        $inbox = $this->inbox;
+        $this->inbox = [];
+
+        return $inbox;
+    }
+
+    /**
+     * Files a message that is not the response we are waiting for.
+     *
+     * @param array<string, mixed> $message
+     * @return bool whether the message was consumed here
+     */
+    private function handleIncoming(array $message): bool
+    {
+        $isRequest = isset($message['method']) && isset($message['id']);
+
+        if ($isRequest) {
+            $this->answer(ServerRequest::fromMessage($message));
+
+            return true;
+        }
+
+        if (isset($message['method'])) {
+            $this->dispatchNotification($message);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function answer(ServerRequest $request): void
+    {
+        if ($this->serverRequestHandler === null) {
+            $this->write([
+                'id' => $request->id,
+                'error' => ['code' => -32601, 'message' => 'This client does not accept server requests.'],
+            ]);
+
+            return;
+        }
+
+        try {
+            $result = ($this->serverRequestHandler)($request);
+        } catch (\Throwable $exception) {
+            $this->write([
+                'id' => $request->id,
+                'error' => ['code' => -32603, 'message' => $exception->getMessage()],
+            ]);
+
+            throw $exception;
+        }
+
+        $this->write(['id' => $request->id, 'result' => $result]);
     }
 
     public function close(): void
@@ -143,9 +255,10 @@ final class JsonRpcConnection
     }
 
     /** @return array<string, mixed> */
-    private function read(): array
+    private function read(?float $timeout = null): array
     {
-        $deadline = microtime(true) + $this->timeout;
+        $timeout ??= $this->timeout;
+        $deadline = microtime(true) + $timeout;
         $buffer = '';
 
         while (microtime(true) < $deadline) {
@@ -187,7 +300,7 @@ final class JsonRpcConnection
             return $message;
         }
 
-        throw new AppServerException(sprintf('Codex app server did not respond within %.1f seconds. %s', $this->timeout, $this->stderr()));
+        throw new AppServerException(sprintf('Codex app server did not respond within %.1f seconds. %s', $timeout, $this->stderr()));
     }
 
     /** @param array<string, mixed> $message */
@@ -198,6 +311,8 @@ final class JsonRpcConnection
             params: is_array($message['params'] ?? null) ? $message['params'] : [],
             raw: $message,
         );
+        $this->inbox[] = $notification;
+
         foreach ($this->notificationListeners as $listener) {
             $listener($notification);
         }
