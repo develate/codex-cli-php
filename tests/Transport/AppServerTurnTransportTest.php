@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Develate\CodexCli\Tests\Transport;
 
 use Develate\CodexCli\Event\AgentMessage;
+use Develate\CodexCli\Event\CodexEvent;
 use Develate\CodexCli\Event\CommandExecution;
 use Develate\CodexCli\Event\ThreadStarted;
 use Develate\CodexCli\Event\TurnCompleted;
@@ -12,9 +13,11 @@ use Develate\CodexCli\Event\TurnFailed;
 use Develate\CodexCli\Exception\UnsupportedApproval;
 use Develate\CodexCli\Transport\ApprovalRequest;
 use Develate\CodexCli\Transport\AppServerTurnTransport;
+use Develate\CodexCli\Transport\ElicitationResponse;
 use Develate\CodexCli\Transport\RunMode;
 use Develate\CodexCli\Transport\RunRequest;
 use Develate\CodexCli\Value\ApprovalDecision;
+use Develate\CodexCli\Value\ElicitationAction;
 use Develate\CodexCli\Value\Sandbox;
 use PHPUnit\Framework\TestCase;
 
@@ -130,6 +133,86 @@ final class AppServerTurnTransportTest extends TestCase
         $this->collect($transport, $this->request());
     }
 
+    public function testElicitationReturnsStructuredContentAndTheTurnContinues(): void
+    {
+        $binary = $this->fakeAppServer([
+            $this->serverRequest('mcpServer/elicitation/request', [
+                'mode' => 'form', 'serverName' => 'boost', 'message' => 'Choose settings',
+                'threadId' => 'thread-1', 'turnId' => 'turn-1',
+                'requestedSchema' => ['type' => 'object', 'properties' => [
+                    'confirm' => ['type' => 'boolean'], 'count' => ['type' => 'integer'],
+                ], 'required' => ['confirm', 'count']],
+            ]),
+            $this->notification('turn/completed', ['turn' => ['id' => 'turn-1', 'status' => 'completed']]),
+        ]);
+        $transport = new AppServerTurnTransport($binary);
+        $transport->onApproval(static function (): never {
+            self::fail('Elicitation is not an approval.');
+        });
+        $transport->onElicitation(function ($request) {
+            self::assertSame('boost', $request->serverName);
+            self::assertSame('Choose settings', $request->message);
+            self::assertSame('thread-1', $request->threadId);
+
+            return new ElicitationResponse(
+                ElicitationAction::Accept, ['confirm' => false, 'count' => 0],
+            );
+        });
+
+        $events = $this->collect($transport, $this->request());
+
+        self::assertInstanceOf(TurnCompleted::class, end($events));
+        self::assertSame(['action' => 'accept', 'content' => ['confirm' => false, 'count' => 0]], $this->elicitationResults($binary)[0]);
+    }
+
+    public function testUnhandledAndUnsupportedElicitationsCancelWithoutFailingTheTurn(): void
+    {
+        foreach ([
+            ['mode' => 'form', 'requestedSchema' => ['type' => 'object', 'properties' => []]],
+            ['mode' => 'openai/form', 'requestedSchema' => ['type' => 'object']],
+            ['mode' => 'form', 'requestedSchema' => ['type' => 'object', 'properties' => ['nested' => ['type' => 'object']]]],
+            ['mode' => 'url', 'url' => 'javascript:alert(1)'],
+        ] as $params) {
+            $binary = $this->fakeAppServer([
+                $this->serverRequest('mcpServer/elicitation/request', $params),
+                $this->notification('turn/completed', ['turn' => ['id' => 'turn-1', 'status' => 'completed']]),
+            ]);
+            $events = $this->collect(new AppServerTurnTransport($binary), $this->request());
+            self::assertInstanceOf(TurnCompleted::class, end($events));
+            self::assertSame([['action' => 'cancel']], $this->elicitationResults($binary));
+        }
+    }
+
+    public function testUrlElicitationsKeepAcceptDeclineAndCancelDistinctAndDiscardNonAcceptedContent(): void
+    {
+        foreach (ElicitationAction::cases() as $action) {
+            $binary = $this->fakeAppServer([
+                $this->serverRequest('mcpServer/elicitation/request', [
+                    'mode' => 'url', 'url' => 'https://example.com/login', 'elicitationId' => 'login-1',
+                ]),
+                $this->notification('turn/completed', ['turn' => ['id' => 'turn-1', 'status' => 'completed']]),
+            ]);
+            $transport = new AppServerTurnTransport($binary);
+            $transport->onElicitation(function ($request) use ($action) {
+                self::assertSame('login-1', $request->elicitationId);
+                self::assertSame('https://example.com/login', $request->url);
+
+                return new ElicitationResponse($action);
+            });
+            $this->collect($transport, $this->request());
+            self::assertSame([['action' => $action->value]], $this->elicitationResults($binary));
+        }
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function elicitationResults(string $binary): array
+    {
+        return array_values(array_map(
+            static fn (array $message): array => $message['result'],
+            array_filter($this->requests($binary), static fn (array $message): bool => isset($message['result']['action'])),
+        ));
+    }
+
     public function testAFailedTurnIsReportedAsAFailure(): void
     {
         $binary = $this->fakeAppServer([
@@ -194,7 +277,7 @@ final class AppServerTurnTransportTest extends TestCase
     }
 
     /**
-     * @return list<\Develate\CodexCli\Event\CodexEvent>
+     * @return list<CodexEvent>
      */
     private function collect(AppServerTurnTransport $transport, RunRequest $request): array
     {

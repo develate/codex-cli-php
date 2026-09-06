@@ -80,14 +80,14 @@ final class Codex
         );
     }
 
-    public function resume(string $id, ?string $cwd = null, ?string $model = null, bool $interactive = false): Thread
+    public function resume(string $id, ?string $cwd = null, ?string $model = null, bool $interactive = false, ?Sandbox $sandbox = null): Thread
     {
         return new Thread(
             transport: $this->transportFor($interactive),
             codexVersion: $this->version(),
             cwd: $this->resolveCwd($cwd),
             model: $model,
-            sandbox: $this->defaultSandbox,
+            sandbox: $sandbox ?? $this->defaultSandbox,
             timeout: $this->timeout,
             threadId: $id,
             nextMode: RunMode::Resume,

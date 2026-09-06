@@ -28,11 +28,12 @@ final class JsonRpcConnection
     /** @var list<Notification> */
     private array $inbox = [];
 
+    /** @param array<string, string> $configOverrides */
     public function __construct(
         private readonly string $binary = 'codex',
         private readonly float $timeout = 10.0,
-    ) {
-    }
+        private readonly array $configOverrides = [],
+    ) {}
 
     public function connect(): void
     {
@@ -46,8 +47,13 @@ final class JsonRpcConnection
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
-        $process = @proc_open([$this->binary, 'app-server', '--stdio'], $descriptors, $pipes, null, null, ['bypass_shell' => true]);
-        if (!is_resource($process)) {
+        $command = [$this->binary, 'app-server', '--stdio'];
+        foreach ($this->configOverrides as $key => $value) {
+            $command[] = '-c';
+            $command[] = $key.'='.$value;
+        }
+        $process = @proc_open($command, $descriptors, $pipes, null, null, ['bypass_shell' => true]);
+        if (! is_resource($process)) {
             throw new CodexNotFound(sprintf('Unable to start Codex binary "%s".', $this->binary));
         }
 
@@ -115,7 +121,7 @@ final class JsonRpcConnection
      * error response rather than silence, because a server request nobody
      * replies to leaves the agent waiting for the rest of the turn.
      *
-     * @param callable(ServerRequest): array<string, mixed> $handler
+     * @param  callable(ServerRequest): array<string, mixed>  $handler
      */
     public function onServerRequest(callable $handler): void
     {
@@ -168,7 +174,7 @@ final class JsonRpcConnection
     /**
      * Files a message that is not the response we are waiting for.
      *
-     * @param array<string, mixed> $message
+     * @param  array<string, mixed>  $message
      * @return bool whether the message was consumed here
      */
     private function handleIncoming(array $message): bool
@@ -281,10 +287,11 @@ final class JsonRpcConnection
                 if (feof($this->pipes[1])) {
                     throw new AppServerException('Codex app server closed its output. '.$this->stderr());
                 }
+
                 continue;
             }
             $buffer .= $chunk;
-            if (!str_ends_with($buffer, "\n")) {
+            if (! str_ends_with($buffer, "\n")) {
                 continue;
             }
 
@@ -293,7 +300,7 @@ final class JsonRpcConnection
             } catch (\JsonException $exception) {
                 throw new JsonRpcException('Codex app server emitted invalid JSON.', previous: $exception);
             }
-            if (!is_array($message)) {
+            if (! is_array($message)) {
                 throw new JsonRpcException('Codex app server emitted a non-object message.');
             }
 

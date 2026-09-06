@@ -15,6 +15,8 @@ use Develate\CodexCli\Exception\UnsupportedApproval;
 use Develate\CodexCli\Parser\JsonlEventParser;
 use Develate\CodexCli\Process\ProcessResult;
 use Develate\CodexCli\Value\ApprovalDecision;
+use Develate\CodexCli\Value\ElicitationAction;
+use Develate\CodexCli\Value\Sandbox;
 
 /**
  * Runs a turn over the app server's bidirectional connection.
@@ -35,6 +37,9 @@ final class AppServerTurnTransport implements Transport
     /** @var (callable(ApprovalRequest): ApprovalDecision)|null */
     private $approvalHandler = null;
 
+    /** @var (callable(ElicitationRequest): ElicitationResponse)|null */
+    private $elicitationHandler = null;
+
     private ?AppServerClient $client = null;
 
     private ?JsonRpcConnection $connection = null;
@@ -45,13 +50,14 @@ final class AppServerTurnTransport implements Transport
 
     private bool $turnFinished = false;
 
+    /** @param array<string, string> $configOverrides */
     public function __construct(
         private readonly string $binary = 'codex',
         private readonly float $requestTimeout = 30.0,
         private readonly NotificationTranslator $translator = new NotificationTranslator,
         private readonly JsonlEventParser $parser = new JsonlEventParser,
-    ) {
-    }
+        private readonly array $configOverrides = [],
+    ) {}
 
     /**
      * How approvals are answered.
@@ -64,6 +70,12 @@ final class AppServerTurnTransport implements Transport
     public function onApproval(callable $handler): void
     {
         $this->approvalHandler = $handler;
+    }
+
+    /** @param callable(ElicitationRequest): ElicitationResponse $handler */
+    public function onElicitation(callable $handler): void
+    {
+        $this->elicitationHandler = $handler;
     }
 
     /**
@@ -79,7 +91,7 @@ final class AppServerTurnTransport implements Transport
      */
     public function stream(RunRequest $request): \Generator
     {
-        $this->connection = new JsonRpcConnection($this->binary, $this->requestTimeout);
+        $this->connection = new JsonRpcConnection($this->binary, $this->requestTimeout, $this->configOverrides);
         $this->client = new AppServerClient($this->connection);
         $this->client->onServerRequest(fn (ServerRequest $serverRequest): array => $this->answer($serverRequest));
 
@@ -164,11 +176,27 @@ final class AppServerTurnTransport implements Transport
     /**
      * Answers a request from the server.
      *
-     * @param  ServerRequest  $request
      * @return array<string, mixed>
      */
     private function answer(ServerRequest $request): array
     {
+        if ($request->method === 'mcpServer/elicitation/request') {
+            $elicitation = ElicitationRequest::fromParams($request->params);
+
+            if ($elicitation === null || $this->elicitationHandler === null) {
+                return ['action' => 'cancel'];
+            }
+
+            $response = ($this->elicitationHandler)($elicitation);
+
+            if ($response->action === ElicitationAction::Accept
+                && $elicitation->mode === ElicitationRequest::MODE_FORM) {
+                ElicitationSchema::validate($elicitation->schema, $response->content ?? []);
+            }
+
+            return $response->toArray();
+        }
+
         $approval = $this->approvalRequest($request);
 
         // Unknown approval methods fail the turn instead of being answered.
@@ -235,7 +263,7 @@ final class AppServerTurnTransport implements Transport
 
             // `on-request` is what makes the agent ask rather than decide for
             // itself; full access is the one profile where it never should.
-            'approvalPolicy' => $request->sandbox === \Develate\CodexCli\Value\Sandbox::FullAccess
+            'approvalPolicy' => $request->sandbox === Sandbox::FullAccess
                 ? 'never'
                 : 'on-request',
         ], static fn (mixed $value): bool => $value !== null);
