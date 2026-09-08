@@ -79,8 +79,15 @@ final class ElicitationSchemaTest extends TestCase
     {
         self::assertSame('{"action":"accept","content":{}}', json_encode((new ElicitationResponse(ElicitationAction::Accept, []))->toArray()));
         foreach ([ElicitationAction::Decline, ElicitationAction::Cancel] as $action) {
-            self::assertSame(['action' => $action->value], (new ElicitationResponse($action, ['private' => 'value']))->toArray());
+            self::assertSame(['action' => $action->value], (new ElicitationResponse($action, ['private' => 'value'], ['persist' => 'always']))->toArray());
         }
+    }
+
+    public function testAcceptPreservesApprovalMetadataAsAnObject(): void
+    {
+        self::assertSame('{"action":"accept","_meta":{"persist":"always"}}', json_encode((new ElicitationResponse(ElicitationAction::Accept, meta: ['persist' => 'always']))->toArray()));
+        self::assertSame('{"action":"accept","_meta":{}}', json_encode((new ElicitationResponse(ElicitationAction::Accept, meta: []))->toArray()));
+        self::assertSame(['action' => 'accept'], (new ElicitationResponse(ElicitationAction::Accept))->toArray());
     }
 
     public function testUnsupportedSchemaConstraintsAreNotSilentlyIgnored(): void

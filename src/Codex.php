@@ -142,7 +142,7 @@ final class Codex
 
         CodexExecutable::assertAvailable($this->binary);
         try {
-            $process = new Process([$this->binary, '--version'], timeout: 5.0);
+            $process = new Process([$this->binary, '--version'], cwd: getcwd() ?: sys_get_temp_dir(), timeout: 5.0);
             $process->mustRun();
         } catch (SymfonyProcessFailed $exception) {
             throw new ProcessFailed($exception->getProcess()->getExitCode() ?? 1, $exception->getProcess()->getErrorOutput());
