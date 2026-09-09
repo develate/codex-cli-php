@@ -7,6 +7,7 @@ namespace Develate\CodexCli\Transport;
 use Develate\CodexCli\AppServer\AppServerClient;
 use Develate\CodexCli\AppServer\JsonRpcConnection;
 use Develate\CodexCli\AppServer\QuotaMapper;
+use Develate\CodexCli\AppServer\RealtimeSession;
 use Develate\CodexCli\Value\Account;
 use Develate\CodexCli\Value\ConsumeRateLimitResetCreditOutcome;
 use Develate\CodexCli\Value\ConsumeRateLimitResetCreditResult;
@@ -54,6 +55,21 @@ final class AppServerTransport
 
             return new ConsumeRateLimitResetCreditResult($typedOutcome);
         });
+    }
+
+    /** Opens a persistent experimental realtime app-server session. */
+    public function realtime(): RealtimeSession
+    {
+        $connection = new JsonRpcConnection($this->binary, $this->timeout);
+        $client = new AppServerClient($connection, experimentalApi: true);
+        try {
+            $client->initialize();
+        } catch (\Throwable $exception) {
+            $connection->close();
+            throw $exception;
+        }
+
+        return new RealtimeSession($client, $connection);
     }
 
     /** @template T @param callable(AppServerClient): T $callback @return T */

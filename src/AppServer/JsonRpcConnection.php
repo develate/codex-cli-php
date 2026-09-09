@@ -19,6 +19,8 @@ final class JsonRpcConnection
 
     private int $nextId = 1;
 
+    private string $readBuffer = '';
+
     /** @var list<callable(Notification): void> */
     private array $notificationListeners = [];
 
@@ -33,7 +35,8 @@ final class JsonRpcConnection
         private readonly string $binary = 'codex',
         private readonly float $timeout = 10.0,
         private readonly array $configOverrides = [],
-    ) {}
+    ) {
+    }
 
     public function connect(): void
     {
@@ -238,6 +241,7 @@ final class JsonRpcConnection
             proc_close($this->process);
         }
         $this->process = null;
+        $this->readBuffer = '';
     }
 
     public function __destruct()
@@ -265,7 +269,6 @@ final class JsonRpcConnection
     {
         $timeout ??= $this->timeout;
         $deadline = microtime(true) + $timeout;
-        $buffer = '';
 
         while (microtime(true) < $deadline) {
             $read = [$this->pipes[1]];
@@ -290,12 +293,14 @@ final class JsonRpcConnection
 
                 continue;
             }
-            $buffer .= $chunk;
-            if (! str_ends_with($buffer, "\n")) {
+            $this->readBuffer .= $chunk;
+            if (! str_ends_with($this->readBuffer, "\n")) {
                 continue;
             }
 
             try {
+                $buffer = $this->readBuffer;
+                $this->readBuffer = '';
                 $message = json_decode(trim($buffer), true, 512, JSON_THROW_ON_ERROR);
             } catch (\JsonException $exception) {
                 throw new JsonRpcException('Codex app server emitted invalid JSON.', previous: $exception);

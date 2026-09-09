@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Develate\CodexCli;
 
+use Develate\CodexCli\AppServer\RealtimeSession;
 use Develate\CodexCli\Exception\CodexNotFound;
 use Develate\CodexCli\Exception\ProcessFailed;
 use Develate\CodexCli\Process\CodexExecutable;
@@ -122,6 +123,16 @@ final class Codex
     public function quota(): Quota
     {
         return $this->appServerTransport->quota();
+    }
+
+    public function appServer(): AppServerTransport
+    {
+        return $this->appServerTransport;
+    }
+
+    public function realtime(): RealtimeSession
+    {
+        return $this->appServerTransport->realtime();
     }
 
     public function account(): Account

@@ -6,6 +6,8 @@ with Codex itself:
 - `codex exec --json` for agent turns, JSONL streaming, threads, resume, fork,
   structured output, and images.
 - `codex app-server --stdio` for account information, quota windows, and credits.
+- experimental thread-scoped realtime voice sessions, including WebRTC SDP
+  negotiation.
 
 The public model is `Codex → Thread → Turn → Events`. CLI commands and app-server
 JSON-RPC are transport details behind that interface.
@@ -189,6 +191,78 @@ $thread = $codex->thread(
 Malformed JSONL, process startup/timeout/failure, and JSON-RPC errors raise typed
 exceptions under `Develate\CodexCli\Exception`. A syntactically valid event with an
 unknown type is not an error.
+
+## Experimental realtime voice
+
+Realtime uses a persistent app-server connection. Audio chunks are base64-encoded
+audio frames, and the app server emits transcript, audio, error, closed, and SDP
+notifications as typed `RealtimeNotification` objects. With WebRTC, create the
+offer using a real `RTCPeerConnection` and pass its SDP to
+`RealtimeTransport::webrtc()`; the remote answer arrives as the
+`thread/realtime/sdp` notification.
+
+```php
+use Develate\CodexCli\Value\RealtimeStartRequest;
+use Develate\CodexCli\Value\RealtimeTransport;
+
+$session = $codex->realtime();
+$threadId = $thread->id(); // An existing persisted thread.
+try {
+    $session->start(new RealtimeStartRequest(
+        threadId: $threadId,
+        transport: RealtimeTransport::webrtc($offerSdp),
+    ));
+    $answerSdp = null;
+    $deadline = microtime(true) + 30;
+    while ($answerSdp === null && microtime(true) < $deadline) {
+        foreach ($session->drain() as $notification) {
+            if ($notification->method === 'thread/realtime/sdp') {
+                $answerSdp = $notification->sdp;
+            }
+            if (in_array($notification->method, ['thread/realtime/error', 'thread/realtime/closed'], true)) {
+                throw new RuntimeException($notification->message ?? $notification->reason ?? 'Realtime closed');
+            }
+        }
+        if ($answerSdp === null) {
+            $session->pump(0.1);
+        }
+    }
+    if ($answerSdp === null) {
+        throw new RuntimeException('Timed out waiting for SDP');
+    }
+    // Forward the answer to the browser for setRemoteDescription().
+    // Keep this connection open and pump/drain while the call is active.
+    $session->stop($threadId); // When the caller ends the call.
+} finally {
+    $session->close();
+}
+```
+
+The session opts into `capabilities.experimentalApi` and resumes each thread on
+its connection before starting realtime. The installed Codex must support the
+requested methods and backend configuration. JSON-RPC errors propagate; there
+is no fallback. The PHP SDK does not implement browser media capture, playback,
+or a WebRTC peer connection.
+
+For app-server audio streaming, select `RealtimeTransport::websocket()` and call
+`$session->appendAudio(new RealtimeAudioChunk($base64Audio, 24000, 1), $threadId)`.
+Import `RealtimeAudioChunk` from `Develate\CodexCli\Value` and supply your audio's
+actual sample rate and channel count. `appendText($threadId, $text)` sends user
+input; its optional third argument is a `RealtimeTextRole` (User, Developer, or
+Assistant). `appendSpeech($threadId, $text)` asks the backend to speak.
+`RealtimeTransport::existingCall($callId)` attaches to a client-negotiated call
+where supported.
+
+Omitting `prompt` retains the server default. Use `prompt: null, omitPrompt: false`
+to explicitly disable it, or `prompt: ''` for empty instructions. Optional false
+flags are preserved. Version and voice are passed through to the server.
+
+Notifications expose transcript, audio, SDP, version, item ID, error, and closure
+fields. Unstable item payloads remain raw JSON in `item`; `params` and `raw` retain
+unknown fields and future realtime methods. `onNotification()` listeners run
+while requests or `pump()` read messages; call `drain()` regularly to release
+queued notifications. `onServerRequest()` allows explicit responses to server
+requests during the call; unhandled requests receive an error.
 
 ## Development
 

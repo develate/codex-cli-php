@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Develate\CodexCli\AppServer;
 
 use Develate\CodexCli\Exception\AppServerException;
+use Develate\CodexCli\Value\RealtimeAudioChunk;
+use Develate\CodexCli\Value\RealtimeStartRequest;
+use Develate\CodexCli\Value\RealtimeTextRole;
 
 final class AppServerClient
 {
     private bool $initialized = false;
 
-    public function __construct(private readonly JsonRpcConnection $connection)
+    public function __construct(private readonly JsonRpcConnection $connection, private readonly bool $experimentalApi = false)
     {
     }
 
@@ -20,13 +23,17 @@ final class AppServerClient
             return;
         }
 
-        $this->connection->request('initialize', [
+        $params = [
             'clientInfo' => [
                 'name' => 'develate_codex_cli_php',
                 'title' => 'Develate Codex CLI PHP',
                 'version' => '0.1.0',
             ],
-        ]);
+        ];
+        if ($this->experimentalApi) {
+            $params['capabilities'] = ['experimentalApi' => true];
+        }
+        $this->connection->request('initialize', $params);
         $this->connection->notify('initialized');
         $this->initialized = true;
     }
@@ -147,6 +154,32 @@ final class AppServerClient
         } catch (\Throwable) {
             // Nothing left to interrupt.
         }
+    }
+
+    public function realtimeStart(RealtimeStartRequest $request): void
+    {
+        $this->initialize();
+        $this->connection->request('thread/realtime/start', $request->toArray());
+    }
+
+    public function realtimeAppendAudio(string $threadId, RealtimeAudioChunk $audio): void
+    {
+        $this->connection->request('thread/realtime/appendAudio', ['threadId' => $threadId, 'audio' => $audio->toArray()]);
+    }
+
+    public function realtimeAppendText(string $threadId, string $text, RealtimeTextRole $role = RealtimeTextRole::User): void
+    {
+        $this->connection->request('thread/realtime/appendText', ['threadId' => $threadId, 'text' => $text, 'role' => $role->value]);
+    }
+
+    public function realtimeAppendSpeech(string $threadId, string $text): void
+    {
+        $this->connection->request('thread/realtime/appendSpeech', ['threadId' => $threadId, 'text' => $text]);
+    }
+
+    public function realtimeStop(string $threadId): void
+    {
+        $this->connection->request('thread/realtime/stop', ['threadId' => $threadId]);
     }
 
     /** @param callable(Notification): void $listener */
