@@ -5,7 +5,7 @@ with Codex itself:
 
 - `codex exec --json` for agent turns, JSONL streaming, threads, resume, fork,
   structured output, and images.
-- `codex app-server --stdio` for account information, quota windows, and credits.
+- `codex app-server --stdio` for account information, quota windows, credits, and interactive agent turns.
 - experimental thread-scoped realtime voice sessions, including WebRTC SDP
   negotiation.
 
@@ -109,6 +109,41 @@ $branch->run('Try the alternative implementation.');
 
 The current Codex CLI does not accept `--cd`, `--sandbox`, or `--add-dir` on its
 resume/fork subcommands; those turns retain the thread's persisted runtime state.
+
+## Interactive app-server turns
+
+When the installed CLI supports the app-server turn protocol, register handlers
+before creating an interactive thread. Runtime sandbox expansion requests arrive
+as a typed `PermissionRequest`; return the subset the user approved. The default
+response is scoped to the current turn.
+
+```php
+use Develate\CodexCli\Codex;
+use Develate\CodexCli\Transport\AppServerTurnTransport;
+use Develate\CodexCli\Transport\PermissionRequest;
+use Develate\CodexCli\Transport\PermissionResponse;
+
+$codex = new Codex(
+    turnTransport: new AppServerTurnTransport,
+);
+
+$codex->turnTransport()?->onPermissionRequest(
+    function (PermissionRequest $request): PermissionResponse {
+        // Present $request->reason and $request->permissions to the user first.
+        return PermissionResponse::grant($request->permissions);
+    },
+);
+
+$thread = $codex->thread(
+    cwd: '/project',
+    interactive: true,
+);
+$result = $thread->run('Work in the project and ask before expanding access.');
+```
+
+Use `PermissionResponse::deny()` when the user declines. Existing command and
+file-change approvals continue to use `onApproval()`, while MCP elicitation
+requests use `onElicitation()`.
 
 ## Result and usage
 

@@ -40,6 +40,9 @@ final class AppServerTurnTransport implements Transport
     /** @var (callable(ElicitationRequest): ElicitationResponse)|null */
     private $elicitationHandler = null;
 
+    /** @var (callable(PermissionRequest): PermissionResponse)|null */
+    private $permissionHandler = null;
+
     private ?AppServerClient $client = null;
 
     private ?JsonRpcConnection $connection = null;
@@ -76,6 +79,12 @@ final class AppServerTurnTransport implements Transport
     public function onElicitation(callable $handler): void
     {
         $this->elicitationHandler = $handler;
+    }
+
+    /** @param callable(PermissionRequest): PermissionResponse $handler */
+    public function onPermissionRequest(callable $handler): void
+    {
+        $this->permissionHandler = $handler;
     }
 
     /**
@@ -195,6 +204,16 @@ final class AppServerTurnTransport implements Transport
             }
 
             return $response->toArray();
+        }
+
+        if ($request->method === PermissionRequest::METHOD) {
+            $permission = PermissionRequest::fromParams($request->params);
+
+            if ($permission === null || $this->permissionHandler === null) {
+                throw new UnsupportedApproval($request->method);
+            }
+
+            return ($this->permissionHandler)($permission)->toArray();
         }
 
         $approval = $this->approvalRequest($request);

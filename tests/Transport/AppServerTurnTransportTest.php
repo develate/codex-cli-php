@@ -14,6 +14,8 @@ use Develate\CodexCli\Exception\UnsupportedApproval;
 use Develate\CodexCli\Transport\ApprovalRequest;
 use Develate\CodexCli\Transport\AppServerTurnTransport;
 use Develate\CodexCli\Transport\ElicitationResponse;
+use Develate\CodexCli\Transport\PermissionRequest;
+use Develate\CodexCli\Transport\PermissionResponse;
 use Develate\CodexCli\Transport\RunMode;
 use Develate\CodexCli\Transport\RunRequest;
 use Develate\CodexCli\Value\ApprovalDecision;
@@ -105,6 +107,88 @@ final class AppServerTurnTransportTest extends TestCase
         $this->collect($transport, $this->request());
 
         self::assertSame('decline', $this->decisions($binary)[0]);
+    }
+
+    public function testARequestForAdditionalPermissionsReceivesTheGrantedProfile(): void
+    {
+        $permissions = [
+            'network' => ['enabled' => true],
+            'fileSystem' => ['write' => ['/tmp/shared']],
+        ];
+        $binary = $this->fakeAppServer([
+            $this->serverRequest('item/permissions/requestApproval', [
+                'threadId' => 'thread-1',
+                'turnId' => 'turn-1',
+                'itemId' => 'permissions-1',
+                'environmentId' => 'local',
+                'startedAtMs' => 1_757_500_000_000,
+                'cwd' => '/tmp/project',
+                'reason' => 'Select a workspace root',
+                'permissions' => $permissions,
+            ]),
+            $this->notification('turn/completed', ['threadId' => 't1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
+        ]);
+
+        $asked = [];
+        $transport = new AppServerTurnTransport($binary);
+        $transport->onPermissionRequest(function (PermissionRequest $request) use (&$asked): PermissionResponse {
+            $asked[] = $request;
+
+            return PermissionResponse::grant($request->permissions);
+        });
+
+        $this->collect($transport, $this->request());
+
+        self::assertCount(1, $asked);
+        self::assertSame('permissions-1', $asked[0]->itemId);
+        self::assertSame('/tmp/project', $asked[0]->cwd);
+        self::assertSame('Select a workspace root', $asked[0]->reason);
+        self::assertSame($permissions, $asked[0]->permissions);
+        self::assertSame(
+            ['permissions' => $permissions],
+            $this->permissionResults($binary)[0],
+        );
+    }
+
+    public function testADeniedPermissionRequestReceivesAnEmptyProfileAndTheTurnContinues(): void
+    {
+        $binary = $this->fakeAppServer([
+            $this->serverRequest('item/permissions/requestApproval', [
+                'threadId' => 'thread-1',
+                'turnId' => 'turn-1',
+                'itemId' => 'permissions-1',
+                'startedAtMs' => 1_757_500_000_000,
+                'cwd' => '/tmp/project',
+                'permissions' => ['network' => ['enabled' => true]],
+            ]),
+            $this->notification('turn/completed', ['threadId' => 't1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
+        ]);
+
+        $transport = new AppServerTurnTransport($binary);
+        $transport->onPermissionRequest(fn (): PermissionResponse => PermissionResponse::deny());
+
+        $events = $this->collect($transport, $this->request());
+
+        self::assertInstanceOf(TurnCompleted::class, end($events));
+        self::assertSame(['permissions' => []], $this->permissionResults($binary)[0]);
+    }
+
+    public function testAnAdditionalPermissionRequestWithoutAHandlerFailsVisibly(): void
+    {
+        $binary = $this->fakeAppServer([
+            $this->serverRequest('item/permissions/requestApproval', [
+                'threadId' => 'thread-1',
+                'turnId' => 'turn-1',
+                'itemId' => 'permissions-1',
+                'startedAtMs' => 1_757_500_000_000,
+                'cwd' => '/tmp/project',
+                'permissions' => ['network' => ['enabled' => true]],
+            ]),
+        ]);
+
+        $this->expectException(UnsupportedApproval::class);
+
+        $this->collect(new AppServerTurnTransport($binary), $this->request());
     }
 
     public function testAnApprovalNobodyCanAnswerFailsTheTurnRatherThanGrantingAccess(): void
@@ -329,6 +413,20 @@ final class AppServerTurnTransportTest extends TestCase
         }
 
         return $decisions;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function permissionResults(string $binary): array
+    {
+        $results = [];
+
+        foreach ($this->requests($binary) as $message) {
+            if (isset($message['result']['permissions'])) {
+                $results[] = $message['result'];
+            }
+        }
+
+        return $results;
     }
 
     /**

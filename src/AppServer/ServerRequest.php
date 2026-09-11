@@ -8,10 +8,11 @@ namespace Develate\CodexCli\AppServer;
  * A request the app server sends to us.
  *
  * The direction that makes an interactive turn possible: the agent stops,
- * asks whether it may run a command or write a file, and waits for the answer
- * on the same connection. A request left unanswered blocks the turn forever,
- * so every one of these has to be replied to — including the ones this client
- * does not understand, which are refused rather than ignored.
+ * asks whether it may run a command, write a file, or expand its permissions,
+ * and waits for the answer on the same connection. A request left unanswered
+ * blocks the turn forever, so every one of these has to be replied to —
+ * including the ones this client does not understand, which are refused rather
+ * than ignored.
  */
 final readonly class ServerRequest
 {

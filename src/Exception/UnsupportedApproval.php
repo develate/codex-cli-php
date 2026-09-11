@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Develate\CodexCli\Exception;
 
 /**
- * The app server asked for an approval this client cannot present.
+ * The app server asked for an approval or permission this client cannot present.
  *
  * Raised rather than answered. Auto-accepting an unknown request would grant
  * access nobody reviewed, and auto-declining would look like a user decision;
