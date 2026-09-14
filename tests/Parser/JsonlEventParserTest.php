@@ -6,6 +6,7 @@ namespace Develate\CodexCli\Tests\Parser;
 
 use Develate\CodexCli\Event\AgentMessage;
 use Develate\CodexCli\Event\FileChange;
+use Develate\CodexCli\Event\TurnCompleted;
 use Develate\CodexCli\Event\UnknownEvent;
 use Develate\CodexCli\Exception\InvalidJsonlEvent;
 use Develate\CodexCli\Parser\JsonlEventParser;
@@ -34,6 +35,21 @@ final class JsonlEventParserTest extends TestCase
         self::assertInstanceOf(UnknownEvent::class, $events[0]);
         self::assertSame('future.event', $events[0]->type);
         self::assertTrue($events[0]->raw()['payload']['anything']);
+    }
+
+    public function testKeepsExecJsonEventsOnTheirExistingPublicClasses(): void
+    {
+        $parser = new JsonlEventParser();
+        $message = $parser->parseLine('{"type":"item.completed","item":{"id":"message-1","type":"agent_message","text":"Done."}}');
+        $completed = $parser->parseLine('{"type":"turn.completed","usage":{"input_tokens":13,"output_tokens":5}}');
+
+        self::assertInstanceOf(AgentMessage::class, $message[0]);
+        self::assertSame('Done.', $message[0]->text);
+        self::assertInstanceOf(TurnCompleted::class, $completed[0]);
+        self::assertSame(13, $completed[0]->usage->inputTokens);
+        self::assertSame(5, $completed[0]->usage->outputTokens);
+        self::assertNull($completed[0]->threadId);
+        self::assertNull($completed[0]->turnId);
     }
 
     public function testExpandsEveryPathInAFileChangeItem(): void

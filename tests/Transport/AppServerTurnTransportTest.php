@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace Develate\CodexCli\Tests\Transport;
 
 use Develate\CodexCli\Event\AgentMessage;
+use Develate\CodexCli\Event\CollaborationToolCall;
 use Develate\CodexCli\Event\CodexEvent;
 use Develate\CodexCli\Event\CommandExecution;
+use Develate\CodexCli\Event\ModelRerouted;
 use Develate\CodexCli\Event\ThreadStarted;
+use Develate\CodexCli\Event\ThreadTokenUsageUpdated;
 use Develate\CodexCli\Event\TurnCompleted;
 use Develate\CodexCli\Event\TurnFailed;
+use Develate\CodexCli\Event\TurnStarted;
+use Develate\CodexCli\Event\UnknownEvent;
 use Develate\CodexCli\Exception\UnsupportedApproval;
 use Develate\CodexCli\Transport\ApprovalRequest;
 use Develate\CodexCli\Transport\AppServerTurnTransport;
@@ -59,12 +64,127 @@ final class AppServerTurnTransportTest extends TestCase
 
         self::assertInstanceOf(ThreadStarted::class, $events[0]);
         self::assertSame('thread-1', $events[0]->threadId);
-        self::assertInstanceOf(AgentMessage::class, $events[1]);
-        self::assertSame('Working', $events[1]->text);
-        self::assertInstanceOf(CommandExecution::class, $events[2]);
-        self::assertSame('ls', $events[2]->command);
-        self::assertSame('README.md', $events[2]->output);
-        self::assertInstanceOf(TurnCompleted::class, $events[3]);
+        self::assertInstanceOf(TurnStarted::class, $events[1]);
+        self::assertSame('thread-1', $events[1]->threadId);
+        self::assertSame('turn-1', $events[1]->turnId);
+        self::assertInstanceOf(AgentMessage::class, $events[2]);
+        self::assertSame('Working', $events[2]->text);
+        self::assertInstanceOf(CommandExecution::class, $events[3]);
+        self::assertSame('ls', $events[3]->command);
+        self::assertSame('README.md', $events[3]->output);
+        self::assertInstanceOf(TurnCompleted::class, $events[4]);
+        self::assertSame('t1', $events[4]->threadId);
+        self::assertSame('turn-1', $events[4]->turnId);
+    }
+
+    public function testStreamsCollaborationIdentityAndEveryTokenUsageSnapshot(): void
+    {
+        $binary = $this->fakeAppServer([
+            $this->notification('item/started', [
+                'threadId' => 'root-thread',
+                'turnId' => 'root-turn',
+                'item' => [
+                    'type' => 'collabToolCall',
+                    'id' => 'spawn-one',
+                    'senderThreadId' => 'root-thread',
+                    'receiverThreadId' => 'child-one',
+                    'model' => 'gpt-5.6-luna',
+                    'status' => 'inProgress',
+                    'tool' => 'spawnAgent',
+                ],
+            ]),
+            $this->notification('item/completed', [
+                'threadId' => 'child-one',
+                'turnId' => 'child-turn',
+                'item' => [
+                    'type' => 'collabAgentToolCall',
+                    'id' => 'spawn-two',
+                    'senderThreadId' => 'child-one',
+                    'receiverThreadIds' => ['child-two'],
+                    'model' => 'gpt-6-astra',
+                    'status' => 'completed',
+                    'tool' => 'spawnAgent',
+                ],
+            ]),
+            $this->notification('thread/tokenUsage/updated', [
+                'threadId' => 'child-one',
+                'turnId' => 'child-turn',
+                'tokenUsage' => [
+                    'last' => ['inputTokens' => 11, 'cachedInputTokens' => 2, 'outputTokens' => 3, 'reasoningOutputTokens' => 1],
+                    'total' => ['inputTokens' => 41, 'cachedInputTokens' => 5, 'outputTokens' => 8, 'reasoningOutputTokens' => 2],
+                ],
+            ]),
+            $this->notification('thread/tokenUsage/updated', [
+                'threadId' => 'child-one',
+                'turnId' => 'child-turn',
+                'tokenUsage' => [
+                    'last' => ['inputTokens' => 11, 'cachedInputTokens' => 2, 'outputTokens' => 3, 'reasoningOutputTokens' => 1],
+                    'total' => ['inputTokens' => 41, 'cachedInputTokens' => 5, 'outputTokens' => 8, 'reasoningOutputTokens' => 2],
+                ],
+            ]),
+            $this->notification('model/rerouted', [
+                'threadId' => 'child-two',
+                'turnId' => 'nested-turn',
+                'fromModel' => 'gpt-6-astra',
+                'toModel' => 'gpt-5.6-sol',
+                'reason' => 'highRiskCyberActivity',
+            ]),
+            $this->notification('item/updated', [
+                'threadId' => 'root-thread',
+                'turnId' => 'root-turn',
+                'item' => ['type' => 'futureItem', 'id' => 'future-1'],
+            ]),
+            $this->notification('thread/future', ['threadId' => 'root-thread']),
+            $this->notification('turn/completed', ['threadId' => 'root-thread', 'turn' => [
+                'id' => 'root-turn', 'status' => 'completed', 'items' => [],
+            ]]),
+        ]);
+
+        $events = $this->collect(new AppServerTurnTransport($binary), $this->request());
+        $collaboration = array_values(array_filter(
+            $events,
+            static fn (CodexEvent $event): bool => $event instanceof CollaborationToolCall,
+        ));
+        $usage = array_values(array_filter(
+            $events,
+            static fn (CodexEvent $event): bool => $event instanceof ThreadTokenUsageUpdated,
+        ));
+        $unknown = array_values(array_filter(
+            $events,
+            static fn (CodexEvent $event): bool => $event instanceof UnknownEvent,
+        ));
+
+        self::assertCount(2, $collaboration);
+        self::assertSame('root-thread', $collaboration[0]->senderThreadId);
+        self::assertSame(['child-one'], $collaboration[0]->receiverThreadIds);
+        self::assertSame('gpt-5.6-luna', $collaboration[0]->requestedModel);
+        self::assertSame('inProgress', $collaboration[0]->status);
+        self::assertSame('child-one', $collaboration[1]->senderThreadId);
+        self::assertSame(['child-two'], $collaboration[1]->receiverThreadIds);
+        self::assertSame('gpt-6-astra', $collaboration[1]->requestedModel);
+        self::assertSame('item/started', $collaboration[0]->raw()['method']);
+
+        self::assertCount(2, $usage, 'Repeated app-server snapshots remain observable to callers.');
+        self::assertSame('child-one', $usage[0]->threadId);
+        self::assertSame('child-turn', $usage[0]->turnId);
+        self::assertSame(11, $usage[0]->last->inputTokens);
+        self::assertSame(41, $usage[0]->total->inputTokens);
+        self::assertSame('thread/tokenUsage/updated', $usage[0]->raw()['method']);
+        self::assertSame(11, $usage[1]->last->inputTokens);
+        self::assertSame(41, $usage[1]->total->inputTokens);
+
+        $reroute = current(array_filter($events, static fn (CodexEvent $event): bool => $event instanceof ModelRerouted));
+        self::assertInstanceOf(ModelRerouted::class, $reroute);
+        self::assertSame('child-two', $reroute->threadId);
+        self::assertSame('nested-turn', $reroute->turnId);
+        self::assertSame('gpt-6-astra', $reroute->fromModel);
+        self::assertSame('gpt-5.6-sol', $reroute->toModel);
+
+        self::assertSame(['item/updated', 'thread/future'], array_map(
+            static fn (UnknownEvent $event): string => $event->type,
+            $unknown,
+        ));
+        self::assertSame('futureItem', $unknown[0]->raw()['params']['item']['type']);
     }
 
     public function testACommandApprovalIsAnsweredWhileTheAgentWaits(): void

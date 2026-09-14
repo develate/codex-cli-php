@@ -26,9 +26,9 @@ use Develate\CodexCli\Value\Sandbox;
  * this transport the agent can stop mid-turn and ask, and the answer travels
  * back on the same connection while it waits.
  *
- * Everything the caller sees is deliberately identical to the exec transport —
- * the same `CodexEvent` objects, in the same order — so the two are
- * interchangeable everywhere except in whether approvals are possible.
+ * Common activity arrives as the same `CodexEvent` objects as the exec
+ * transport. App-server-only protocol facts, such as collaboration identity
+ * and token snapshots, remain typed instead of being discarded.
  *
  * @see https://developers.openai.com/codex/app-server
  */
@@ -52,6 +52,8 @@ final class AppServerTurnTransport implements Transport
     private ?string $turnId = null;
 
     private bool $turnFinished = false;
+
+    private bool $turnStartedEventEmitted = false;
 
     /** @param array<string, string> $configOverrides */
     public function __construct(
@@ -106,6 +108,7 @@ final class AppServerTurnTransport implements Transport
 
         $deadline = microtime(true) + ($request->timeout ?? 3600.0);
         $this->turnFinished = false;
+        $this->turnStartedEventEmitted = false;
 
         try {
             $this->threadId = $request->threadId !== null && $request->mode === RunMode::Resume
@@ -118,6 +121,16 @@ final class AppServerTurnTransport implements Transport
             yield from $this->events(['type' => 'thread.started', 'thread_id' => $this->threadId]);
 
             $this->turnId = $this->client->turnStart($this->turnParams($request));
+            $this->turnStartedEventEmitted = true;
+
+            // `turn/start` already returns these lifecycle identifiers. Emit
+            // them even when a server version does not repeat turn/started as
+            // a notification, then suppress that duplicate below.
+            yield from $this->events([
+                'type' => 'turn.started',
+                'thread_id' => $this->threadId,
+                'turn_id' => $this->turnId,
+            ]);
 
             yield from $this->drain();
 
@@ -131,7 +144,7 @@ final class AppServerTurnTransport implements Transport
                 foreach ($this->client->drain() as $notification) {
                     $translated = $this->translator->translate($notification);
 
-                    if ($translated === null) {
+                    if ($translated['type'] === 'turn.started' && $this->turnStartedEventEmitted) {
                         continue;
                     }
 
@@ -176,9 +189,11 @@ final class AppServerTurnTransport implements Transport
         foreach ($this->client?->drain() ?? [] as $notification) {
             $translated = $this->translator->translate($notification);
 
-            if ($translated !== null) {
-                yield from $this->events($translated);
+            if ($translated['type'] === 'turn.started' && $this->turnStartedEventEmitted) {
+                continue;
             }
+
+            yield from $this->events($translated);
         }
     }
 

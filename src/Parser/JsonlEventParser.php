@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Develate\CodexCli\Parser;
 
 use Develate\CodexCli\Event\AgentMessage;
+use Develate\CodexCli\Event\CollaborationToolCall;
 use Develate\CodexCli\Event\CodexEvent;
 use Develate\CodexCli\Event\CommandExecution;
 use Develate\CodexCli\Event\ErrorEvent;
 use Develate\CodexCli\Event\FileChange;
+use Develate\CodexCli\Event\ModelRerouted;
 use Develate\CodexCli\Event\Reasoning;
 use Develate\CodexCli\Event\ThreadStarted;
+use Develate\CodexCli\Event\ThreadTokenUsageUpdated;
 use Develate\CodexCli\Event\TodoList;
 use Develate\CodexCli\Event\TurnCompleted;
 use Develate\CodexCli\Event\TurnFailed;
@@ -50,9 +53,48 @@ final class JsonlEventParser
 
         return match ($type) {
             'thread.started' => [new ThreadStarted(self::string($data['thread_id'] ?? $data['threadId'] ?? ''), $data)],
-            'turn.started' => [new TurnStarted($data)],
-            'turn.completed' => [new TurnCompleted(Usage::fromArray(self::map($data['usage'] ?? [])), $data)],
-            'turn.failed' => [new TurnFailed(self::message($data), $data)],
+            'turn.started' => [new TurnStarted($data, self::nullableString($data['thread_id'] ?? $data['threadId'] ?? null), self::nullableString($data['turn_id'] ?? $data['turnId'] ?? null))],
+            'turn.completed' => [new TurnCompleted(
+                Usage::fromArray(self::map($data['usage'] ?? [])),
+                $data,
+                self::nullableString($data['thread_id'] ?? $data['threadId'] ?? null),
+                self::nullableString($data['turn_id'] ?? $data['turnId'] ?? null),
+            )],
+            'turn.failed' => [new TurnFailed(
+                self::message($data),
+                $data,
+                self::nullableString($data['thread_id'] ?? $data['threadId'] ?? null),
+                self::nullableString($data['turn_id'] ?? $data['turnId'] ?? null),
+            )],
+            'thread.token_usage.updated' => [new ThreadTokenUsageUpdated(
+                threadId: self::string($data['thread_id'] ?? $data['threadId'] ?? ''),
+                turnId: self::string($data['turn_id'] ?? $data['turnId'] ?? ''),
+                last: Usage::fromArray(self::map($data['last_usage'] ?? $data['lastUsage'] ?? [])),
+                total: Usage::fromArray(self::map($data['total_usage'] ?? $data['totalUsage'] ?? [])),
+                raw: self::appServerRaw($data),
+            )],
+            'collaboration.tool_call' => [new CollaborationToolCall(
+                id: self::string($data['id'] ?? ''),
+                senderThreadId: self::string($data['sender_thread_id'] ?? $data['senderThreadId'] ?? ''),
+                receiverThreadIds: self::strings($data['receiver_thread_ids'] ?? $data['receiverThreadIds'] ?? []),
+                requestedModel: self::nullableString($data['requested_model'] ?? $data['requestedModel'] ?? null),
+                status: self::nullableString($data['status'] ?? null),
+                tool: self::nullableString($data['tool'] ?? null),
+                phase: self::string($data['phase'] ?? ''),
+                raw: self::appServerRaw($data),
+            )],
+            'model.rerouted' => [new ModelRerouted(
+                threadId: self::string($data['thread_id'] ?? $data['threadId'] ?? ''),
+                turnId: self::string($data['turn_id'] ?? $data['turnId'] ?? ''),
+                fromModel: self::string($data['from_model'] ?? $data['fromModel'] ?? ''),
+                toModel: self::string($data['to_model'] ?? $data['toModel'] ?? ''),
+                reason: self::nullableString($data['reason'] ?? null),
+                raw: self::appServerRaw($data),
+            )],
+            'app_server.unknown' => [new UnknownEvent(
+                self::string($data['method'] ?? 'app_server.unknown'),
+                self::appServerRaw($data),
+            )],
             'error' => [new ErrorEvent(self::message($data), $data)],
             'item.started', 'item.updated', 'item.completed' => $this->parseItem($data, substr($type, 5)),
             default => [new UnknownEvent($type, $data)],
@@ -160,5 +202,36 @@ final class JsonlEventParser
         }
 
         return '';
+    }
+
+    private static function nullableString(mixed $value): ?string
+    {
+        $value = self::string($value);
+
+        return $value === '' ? null : $value;
+    }
+
+    /** @return list<string> */
+    private static function strings(mixed $value): array
+    {
+        if (! is_array($value)) {
+            $value = [$value];
+        }
+
+        $strings = [];
+        foreach ($value as $item) {
+            $item = self::string($item);
+            if ($item !== '') {
+                $strings[] = $item;
+            }
+        }
+
+        return array_values(array_unique($strings));
+    }
+
+    /** @param array<string, mixed> $data @return array<string, mixed> */
+    private static function appServerRaw(array $data): array
+    {
+        return self::map($data['raw'] ?? $data);
     }
 }

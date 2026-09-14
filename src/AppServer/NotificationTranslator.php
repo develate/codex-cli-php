@@ -15,34 +15,63 @@ namespace Develate\CodexCli\AppServer;
  * parser, the normalizer, the UI — keeps working unchanged whichever transport
  * ran the turn.
  *
- * A notification with no JSONL counterpart returns null and is dropped: the
- * app server emits a great deal that the exec stream never had, and inventing
- * events for it would put entries in the transcript that no other run produces.
+ * App-server-only facts stay typed when the protocol identifies them. Unknown
+ * notifications are deliberately retained as raw events so a newer Codex CLI
+ * cannot become silent data loss for callers that stream a turn.
  */
 final class NotificationTranslator
 {
     /**
-     * @return array<string, mixed>|null
+     * @return array<string, mixed>
      */
-    public function translate(Notification $notification): ?array
+    public function translate(Notification $notification): array
     {
         $params = $notification->params;
 
         return match ($notification->method) {
-            'thread/started' => [
-                'type' => 'thread.started',
-                'thread_id' => $this->string($this->map($params['thread'] ?? [])['id'] ?? ''),
-            ],
-            'turn/started' => ['type' => 'turn.started'],
+            'thread/started' => $this->threadStarted($params),
+            'turn/started' => $this->turnStarted($params),
             'turn/completed' => $this->turnCompleted($params),
+            'thread/tokenUsage/updated', 'thread/token_usage/updated' => $this->tokenUsageUpdated($params, $notification->raw),
+            'model/rerouted', 'thread/model/rerouted' => $this->modelRerouted($params, $notification->raw),
             'error' => [
                 'type' => 'error',
                 'message' => $this->string($this->map($params['error'] ?? [])['message'] ?? ''),
             ],
-            'item/started' => $this->item($params, 'started'),
-            'item/completed' => $this->item($params, 'completed'),
-            default => null,
+            'item/started' => $this->item($notification, 'started'),
+            'item/completed' => $this->item($notification, 'completed'),
+            'item/updated' => $this->item($notification, 'updated'),
+            default => $this->unknown($notification),
         };
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     * @return array<string, mixed>
+     */
+    private function threadStarted(array $params): array
+    {
+        $thread = $this->map($params['thread'] ?? []);
+
+        return [
+            'type' => 'thread.started',
+            'thread_id' => $this->string($thread['id'] ?? $params['threadId'] ?? $params['thread_id'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     * @return array<string, mixed>
+     */
+    private function turnStarted(array $params): array
+    {
+        $turn = $this->map($params['turn'] ?? []);
+
+        return [
+            'type' => 'turn.started',
+            'thread_id' => $this->string($params['threadId'] ?? $params['thread_id'] ?? ''),
+            'turn_id' => $this->string($turn['id'] ?? $params['turnId'] ?? $params['turn_id'] ?? ''),
+        ];
     }
 
     /**
@@ -53,6 +82,8 @@ final class NotificationTranslator
     {
         $turn = $this->map($params['turn'] ?? []);
         $error = $this->map($turn['error'] ?? []);
+        $threadId = $this->string($params['threadId'] ?? $params['thread_id'] ?? '');
+        $turnId = $this->string($turn['id'] ?? $params['turnId'] ?? $params['turn_id'] ?? '');
 
         // A turn the server reports as failed is a failure even though the
         // notification that carried it is the completion one.
@@ -60,23 +91,68 @@ final class NotificationTranslator
             return [
                 'type' => 'turn.failed',
                 'message' => $this->string($error['message'] ?? 'The turn failed.'),
+                'thread_id' => $threadId,
+                'turn_id' => $turnId,
             ];
         }
 
         return [
             'type' => 'turn.completed',
             'usage' => $this->map($turn['usage'] ?? []),
+            'thread_id' => $threadId,
+            'turn_id' => $turnId,
         ];
     }
 
     /**
-     * @param  array<string, mixed>  $params
-     * @return array<string, mixed>|null
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $raw
+     * @return array<string, mixed>
      */
-    private function item(array $params, string $phase): ?array
+    private function tokenUsageUpdated(array $params, array $raw): array
     {
+        $usage = $this->map($params['tokenUsage'] ?? $params['token_usage'] ?? []);
+
+        return [
+            'type' => 'thread.token_usage.updated',
+            'thread_id' => $this->string($params['threadId'] ?? $params['thread_id'] ?? ''),
+            'turn_id' => $this->string($params['turnId'] ?? $params['turn_id'] ?? ''),
+            'last_usage' => $this->map($usage['last'] ?? $usage['lastUsage'] ?? []),
+            'total_usage' => $this->map($usage['total'] ?? $usage['totalUsage'] ?? []),
+            'raw' => $raw,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $raw
+     * @return array<string, mixed>
+     */
+    private function modelRerouted(array $params, array $raw): array
+    {
+        return [
+            'type' => 'model.rerouted',
+            'thread_id' => $this->string($params['threadId'] ?? $params['thread_id'] ?? ''),
+            'turn_id' => $this->string($params['turnId'] ?? $params['turn_id'] ?? ''),
+            'from_model' => $this->string($params['fromModel'] ?? $params['from_model'] ?? ''),
+            'to_model' => $this->string($params['toModel'] ?? $params['to_model'] ?? ''),
+            'reason' => $this->nullableString($params['reason'] ?? null),
+            'raw' => $raw,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function item(Notification $notification, string $phase): array
+    {
+        $params = $notification->params;
         $item = $this->map($params['item'] ?? []);
         $type = $this->string($item['type'] ?? '');
+
+        if ($this->isCollaborationToolCall($type)) {
+            return $this->collaborationToolCall($params, $item, $phase, $notification->raw);
+        }
 
         $translated = match ($type) {
             'agentMessage' => ['type' => 'agent_message', 'id' => $item['id'] ?? '', 'text' => $item['text'] ?? ''],
@@ -103,10 +179,73 @@ final class NotificationTranslator
         };
 
         if ($translated === null) {
-            return null;
+            return $this->unknown($notification);
         }
 
         return ['type' => 'item.'.$phase, 'item' => $translated];
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $item
+     * @param array<string, mixed> $raw
+     * @return array<string, mixed>
+     */
+    private function collaborationToolCall(array $params, array $item, string $phase, array $raw): array
+    {
+        return [
+            'type' => 'collaboration.tool_call',
+            'id' => $this->string($item['id'] ?? $item['callId'] ?? $params['itemId'] ?? $params['id'] ?? ''),
+            'sender_thread_id' => $this->string(
+                $item['senderThreadId']
+                    ?? $item['sender_thread_id']
+                    ?? $params['senderThreadId']
+                    ?? $params['sender_thread_id']
+                    ?? $params['threadId']
+                    ?? $params['thread_id']
+                    ?? '',
+            ),
+            'receiver_thread_ids' => $this->strings(
+                $item['receiverThreadIds']
+                    ?? $item['receiver_thread_ids']
+                    ?? $item['receiverThreadId']
+                    ?? $item['receiver_thread_id']
+                    ?? $item['childThreadIds']
+                    ?? $item['childThreadId']
+                    ?? $item['agentThreadIds']
+                    ?? $item['agentThreadId']
+                    ?? $params['receiverThreadIds']
+                    ?? $params['receiver_thread_ids']
+                    ?? $params['receiverThreadId']
+                    ?? $params['receiver_thread_id']
+                    ?? $params['childThreadIds']
+                    ?? $params['childThreadId']
+                    ?? [],
+            ),
+            'requested_model' => $this->nullableString(
+                $item['requestedModel']
+                    ?? $item['requested_model']
+                    ?? $item['model']
+                    ?? $params['requestedModel']
+                    ?? $params['requested_model']
+                    ?? $params['model']
+                    ?? null,
+            ),
+            'status' => $this->nullableString($item['status'] ?? $params['status'] ?? null),
+            'tool' => $this->nullableString($item['tool'] ?? $params['tool'] ?? null),
+            'phase' => $phase,
+            'raw' => $raw,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function unknown(Notification $notification): array
+    {
+        return [
+            'type' => 'app_server.unknown',
+            'method' => $notification->method,
+            'raw' => $notification->raw,
+        ];
     }
 
     /**
@@ -143,5 +282,42 @@ final class NotificationTranslator
     private function string(mixed $value): string
     {
         return is_scalar($value) ? (string) $value : '';
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        $value = $this->string($value);
+
+        return $value === '' ? null : $value;
+    }
+
+    private function isCollaborationToolCall(string $type): bool
+    {
+        return in_array(strtolower($type), [
+            'collabtoolcall',
+            'collabagenttoolcall',
+            'collaborationtoolcall',
+            'collab_tool_call',
+            'collab_agent_tool_call',
+            'collaboration_tool_call',
+        ], true);
+    }
+
+    /** @return list<string> */
+    private function strings(mixed $values): array
+    {
+        if (! is_array($values)) {
+            $values = [$values];
+        }
+
+        $strings = [];
+        foreach ($values as $value) {
+            $value = $this->string($value);
+            if ($value !== '') {
+                $strings[] = $value;
+            }
+        }
+
+        return array_values(array_unique($strings));
     }
 }
