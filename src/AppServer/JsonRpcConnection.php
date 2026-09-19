@@ -8,6 +8,7 @@ use Develate\CodexCli\Exception\AppServerException;
 use Develate\CodexCli\Exception\CodexNotFound;
 use Develate\CodexCli\Exception\JsonRpcException;
 use Develate\CodexCli\Process\CodexExecutable;
+use Develate\CodexCli\Process\ProcessEnvironment;
 
 final class JsonRpcConnection
 {
@@ -30,11 +31,15 @@ final class JsonRpcConnection
     /** @var list<Notification> */
     private array $inbox = [];
 
-    /** @param array<string, string> $configOverrides */
+    /**
+     * @param array<string, string> $configOverrides
+     * @param array<string, string|false> $env variables for the child; `false` removes an inherited one
+     */
     public function __construct(
         private readonly string $binary = 'codex',
         private readonly float $timeout = 10.0,
         private readonly array $configOverrides = [],
+        private readonly array $env = [],
     ) {
     }
 
@@ -55,7 +60,7 @@ final class JsonRpcConnection
             $command[] = '-c';
             $command[] = $key.'='.$value;
         }
-        $process = @proc_open($command, $descriptors, $pipes, null, null, ['bypass_shell' => true]);
+        $process = @proc_open($command, $descriptors, $pipes, null, ProcessEnvironment::resolve($this->env), ['bypass_shell' => true]);
         if (! is_resource($process)) {
             throw new CodexNotFound(sprintf('Unable to start Codex binary "%s".', $this->binary));
         }

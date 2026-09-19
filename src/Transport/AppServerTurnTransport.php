@@ -55,13 +55,17 @@ final class AppServerTurnTransport implements Transport
 
     private bool $turnStartedEventEmitted = false;
 
-    /** @param array<string, string> $configOverrides */
+    /**
+     * @param array<string, string> $configOverrides
+     * @param array<string, string|false> $env variables for the child; `false` removes an inherited one
+     */
     public function __construct(
         private readonly string $binary = 'codex',
         private readonly float $requestTimeout = 30.0,
         private readonly NotificationTranslator $translator = new NotificationTranslator,
         private readonly JsonlEventParser $parser = new JsonlEventParser,
         private readonly array $configOverrides = [],
+        private readonly array $env = [],
     ) {}
 
     /**
@@ -102,7 +106,7 @@ final class AppServerTurnTransport implements Transport
      */
     public function stream(RunRequest $request): \Generator
     {
-        $this->connection = new JsonRpcConnection($this->binary, $this->requestTimeout, $this->configOverrides);
+        $this->connection = new JsonRpcConnection($this->binary, $this->requestTimeout, $this->configOverrides, $this->env);
         $this->client = new AppServerClient($this->connection);
         $this->client->onServerRequest(fn (ServerRequest $serverRequest): array => $this->answer($serverRequest));
 

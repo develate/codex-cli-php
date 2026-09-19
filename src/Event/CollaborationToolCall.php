@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Develate\CodexCli\Event;
 
 /**
- * A collaboration-tool item emitted by the Codex app server.
+ * A collaboration-tool item emitted by Codex exec or the app server.
  *
  * Codex has used both `collabToolCall` and `collabAgentToolCall` for this
  * item over time. The transport normalizes their shared protocol facts here

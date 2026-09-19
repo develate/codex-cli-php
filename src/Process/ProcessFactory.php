@@ -6,9 +6,12 @@ namespace Develate\CodexCli\Process;
 
 class ProcessFactory
 {
-    /** @param list<string> $command */
-    public function create(array $command, ?string $cwd = null, ?float $timeout = null): CodexProcess
+    /**
+     * @param list<string> $command
+     * @param array<string, string|false> $env variables for the child; `false` removes an inherited one
+     */
+    public function create(array $command, ?string $cwd = null, ?float $timeout = null, array $env = []): CodexProcess
     {
-        return new CodexProcess($command, $cwd, $timeout);
+        return new CodexProcess($command, $cwd, $timeout, $env);
     }
 }

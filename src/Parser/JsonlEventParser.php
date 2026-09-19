@@ -112,6 +112,28 @@ final class JsonlEventParser
         $id = self::string($item['id'] ?? '');
 
         return match ($itemType) {
+            'collab_tool_call', 'collab_agent_tool_call', 'collaboration_tool_call',
+            'collabToolCall', 'collabAgentToolCall', 'collaborationToolCall' => [new CollaborationToolCall(
+                id: self::string($item['id'] ?? $item['callId'] ?? $event['itemId'] ?? $event['id'] ?? ''),
+                senderThreadId: self::string($item['sender_thread_id'] ?? $item['senderThreadId'] ?? $event['sender_thread_id'] ?? $event['senderThreadId'] ?? $event['thread_id'] ?? $event['threadId'] ?? ''),
+                receiverThreadIds: self::strings(
+                    $item['receiver_thread_ids'] ?? $item['receiverThreadIds']
+                        ?? $item['receiver_thread_id'] ?? $item['receiverThreadId']
+                        ?? $item['child_thread_ids'] ?? $item['childThreadIds']
+                        ?? $item['child_thread_id'] ?? $item['childThreadId']
+                        ?? $item['agent_thread_ids'] ?? $item['agentThreadIds']
+                        ?? $item['agent_thread_id'] ?? $item['agentThreadId']
+                        ?? $event['receiver_thread_ids'] ?? $event['receiverThreadIds']
+                        ?? $event['receiver_thread_id'] ?? $event['receiverThreadId']
+                        ?? $event['child_thread_ids'] ?? $event['childThreadIds']
+                        ?? $event['child_thread_id'] ?? $event['childThreadId'] ?? [],
+                ),
+                requestedModel: self::nullableString($item['requested_model'] ?? $item['requestedModel'] ?? $item['model'] ?? $event['requested_model'] ?? $event['requestedModel'] ?? $event['model'] ?? null),
+                status: self::nullableString($item['status'] ?? $event['status'] ?? null),
+                tool: self::nullableString($item['tool'] ?? $event['tool'] ?? null),
+                phase: $phase,
+                raw: $event,
+            )],
             'agent_message' => [new AgentMessage($id, self::string($item['text'] ?? $item['message'] ?? ''), $phase, $event)],
             'reasoning' => [new Reasoning($id, self::string($item['text'] ?? $item['summary'] ?? ''), $phase, $event)],
             'command_execution' => [new CommandExecution(

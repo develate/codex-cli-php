@@ -15,10 +15,12 @@ use Develate\CodexCli\Value\Quota;
 
 final class AppServerTransport
 {
+    /** @param array<string, string|false> $env variables for the child; `false` removes an inherited one */
     public function __construct(
         private readonly string $binary = 'codex',
         private readonly float $timeout = 10.0,
         private readonly QuotaMapper $quotaMapper = new QuotaMapper(),
+        private readonly array $env = [],
     ) {
     }
 
@@ -60,7 +62,7 @@ final class AppServerTransport
     /** Opens a persistent experimental realtime app-server session. */
     public function realtime(): RealtimeSession
     {
-        $connection = new JsonRpcConnection($this->binary, $this->timeout);
+        $connection = new JsonRpcConnection($this->binary, $this->timeout, env: $this->env);
         $client = new AppServerClient($connection, experimentalApi: true);
         try {
             $client->initialize();
@@ -75,7 +77,7 @@ final class AppServerTransport
     /** @template T @param callable(AppServerClient): T $callback @return T */
     private function withClient(callable $callback): mixed
     {
-        $connection = new JsonRpcConnection($this->binary, $this->timeout);
+        $connection = new JsonRpcConnection($this->binary, $this->timeout, env: $this->env);
         try {
             return $callback(new AppServerClient($connection));
         } finally {

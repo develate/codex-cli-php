@@ -12,11 +12,15 @@ final class CodexProcess
 {
     private string $stderr = '';
 
-    /** @param list<string> $command */
+    /**
+     * @param list<string> $command
+     * @param array<string, string|false> $env variables for the child; `false` removes an inherited one
+     */
     public function __construct(
         private readonly array $command,
         private readonly ?string $cwd = null,
         private readonly ?float $timeout = null,
+        private readonly array $env = [],
     ) {
     }
 
@@ -24,7 +28,7 @@ final class CodexProcess
     public function lines(): \Generator
     {
         CodexExecutable::assertAvailable($this->command[0]);
-        $process = new Process($this->command, $this->cwd, timeout: $this->timeout);
+        $process = new Process($this->command, $this->cwd, $this->env, timeout: $this->timeout);
         $reader = new JsonlReader();
 
         try {

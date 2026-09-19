@@ -221,6 +221,27 @@ $thread = $codex->thread(
 );
 ```
 
+## Process environment
+
+Every Codex process this SDK starts — `codex exec`, `codex app-server` and the
+version probe — inherits the PHP process's environment. Pass `env` to control
+that: a string sets a variable for the child, and `false` removes one the parent
+would otherwise hand down.
+
+```php
+$codex = new Codex(
+    binary: '/usr/local/bin/codex',
+    env: [
+        'CODEX_HOME' => '/var/accounts/alice',
+        'OPENAI_API_KEY' => false,
+    ],
+);
+```
+
+Omitting `env` keeps the plain inheriting behaviour. The same parameter exists on
+`ExecTransport`, `AppServerTransport` and `AppServerTurnTransport` for callers
+that build their own transports.
+
 ## Failure model
 
 Malformed JSONL, process startup/timeout/failure, and JSON-RPC errors raise typed

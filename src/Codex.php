@@ -30,15 +30,21 @@ final class Codex
     private ?string $defaultCwd = null;
     private Sandbox $defaultSandbox = Sandbox::ReadOnly;
 
+    /**
+     * @param array<string, string|false> $env the environment every Codex process this client
+     *                                         starts runs under; `false` removes an inherited
+     *                                         variable. Empty means "inherit", as before.
+     */
     public function __construct(
         private readonly string $binary = 'codex',
         ?Transport $execTransport = null,
         ?AppServerTransport $appServerTransport = null,
         private readonly ?float $timeout = null,
         ?AppServerTurnTransport $turnTransport = null,
+        private readonly array $env = [],
     ) {
-        $this->execTransport = $execTransport ?? new ExecTransport($binary);
-        $this->appServerTransport = $appServerTransport ?? new AppServerTransport($binary);
+        $this->execTransport = $execTransport ?? new ExecTransport($binary, env: $env);
+        $this->appServerTransport = $appServerTransport ?? new AppServerTransport($binary, env: $env);
         $this->turnTransport = $turnTransport;
     }
 
@@ -153,7 +159,7 @@ final class Codex
 
         CodexExecutable::assertAvailable($this->binary);
         try {
-            $process = new Process([$this->binary, '--version'], cwd: getcwd() ?: sys_get_temp_dir(), timeout: 5.0);
+            $process = new Process([$this->binary, '--version'], cwd: getcwd() ?: sys_get_temp_dir(), env: $this->env, timeout: 5.0);
             $process->mustRun();
         } catch (SymfonyProcessFailed $exception) {
             throw new ProcessFailed($exception->getProcess()->getExitCode() ?? 1, $exception->getProcess()->getErrorOutput());

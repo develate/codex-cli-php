@@ -10,10 +10,12 @@ use Develate\CodexCli\Process\ProcessResult;
 
 final class ExecTransport implements Transport
 {
+    /** @param array<string, string|false> $env variables for the child; `false` removes an inherited one */
     public function __construct(
         private readonly string $binary = 'codex',
         private readonly ProcessFactory $processFactory = new ProcessFactory(),
         private readonly JsonlEventParser $parser = new JsonlEventParser(),
+        private readonly array $env = [],
     ) {
     }
 
@@ -26,6 +28,7 @@ final class ExecTransport implements Transport
                 $this->command($request, $schemaFile),
                 $request->cwd,
                 $request->timeout,
+                $this->env,
             );
             $lines = $process->lines();
 
