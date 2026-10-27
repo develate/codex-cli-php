@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Develate\CodexCli\Parser;
 
 use Develate\CodexCli\Event\AgentMessage;
+use Develate\CodexCli\Event\AccountRateLimitsUpdated;
+use Develate\CodexCli\AppServer\QuotaMapper;
 use Develate\CodexCli\Event\CollaborationToolCall;
 use Develate\CodexCli\Event\CodexEvent;
 use Develate\CodexCli\Event\CommandExecution;
@@ -40,38 +42,45 @@ final class JsonlEventParser
         }
 
         /** @var array<string, mixed> $data */
-        return $this->parse($data);
+        return $this->parse($data, $data);
     }
 
     /**
      * @param array<string, mixed> $data
+     * @param array<string, mixed>|null $raw original payload; translated events carry it in `raw`
      * @return list<CodexEvent>
      */
-    public function parse(array $data): array
+    public function parse(array $data, ?array $raw = null): array
     {
         $type = is_string($data['type'] ?? null) ? $data['type'] : '';
+        $raw ??= self::appServerRaw($data);
 
         return match ($type) {
-            'thread.started' => [new ThreadStarted(self::string($data['thread_id'] ?? $data['threadId'] ?? ''), $data)],
-            'turn.started' => [new TurnStarted($data, self::nullableString($data['thread_id'] ?? $data['threadId'] ?? null), self::nullableString($data['turn_id'] ?? $data['turnId'] ?? null))],
+            'account.rate_limits.updated' => [new AccountRateLimitsUpdated(
+                quota: (new QuotaMapper())->map(self::map($data['rate_limits'] ?? [])),
+                raw: $raw,
+            )],
+            'thread.started' => [new ThreadStarted(self::string($data['thread_id'] ?? $data['threadId'] ?? ''), $raw)],
+            'turn.started' => [new TurnStarted($raw, self::nullableString($data['thread_id'] ?? $data['threadId'] ?? null), self::nullableString($data['turn_id'] ?? $data['turnId'] ?? null))],
             'turn.completed' => [new TurnCompleted(
                 Usage::fromArray(self::map($data['usage'] ?? [])),
-                $data,
+                $raw,
                 self::nullableString($data['thread_id'] ?? $data['threadId'] ?? null),
                 self::nullableString($data['turn_id'] ?? $data['turnId'] ?? null),
             )],
             'turn.failed' => [new TurnFailed(
                 self::message($data),
-                $data,
+                $raw,
                 self::nullableString($data['thread_id'] ?? $data['threadId'] ?? null),
                 self::nullableString($data['turn_id'] ?? $data['turnId'] ?? null),
+                self::string($data['status'] ?? 'failed'),
             )],
             'thread.token_usage.updated' => [new ThreadTokenUsageUpdated(
                 threadId: self::string($data['thread_id'] ?? $data['threadId'] ?? ''),
                 turnId: self::string($data['turn_id'] ?? $data['turnId'] ?? ''),
                 last: Usage::fromArray(self::map($data['last_usage'] ?? $data['lastUsage'] ?? [])),
                 total: Usage::fromArray(self::map($data['total_usage'] ?? $data['totalUsage'] ?? [])),
-                raw: self::appServerRaw($data),
+                raw: $raw,
             )],
             'collaboration.tool_call' => [new CollaborationToolCall(
                 id: self::string($data['id'] ?? ''),
@@ -81,7 +90,7 @@ final class JsonlEventParser
                 status: self::nullableString($data['status'] ?? null),
                 tool: self::nullableString($data['tool'] ?? null),
                 phase: self::string($data['phase'] ?? ''),
-                raw: self::appServerRaw($data),
+                raw: $raw,
             )],
             'model.rerouted' => [new ModelRerouted(
                 threadId: self::string($data['thread_id'] ?? $data['threadId'] ?? ''),
@@ -89,23 +98,24 @@ final class JsonlEventParser
                 fromModel: self::string($data['from_model'] ?? $data['fromModel'] ?? ''),
                 toModel: self::string($data['to_model'] ?? $data['toModel'] ?? ''),
                 reason: self::nullableString($data['reason'] ?? null),
-                raw: self::appServerRaw($data),
+                raw: $raw,
             )],
             'app_server.unknown' => [new UnknownEvent(
                 self::string($data['method'] ?? 'app_server.unknown'),
-                self::appServerRaw($data),
+                $raw,
             )],
-            'error' => [new ErrorEvent(self::message($data), $data)],
-            'item.started', 'item.updated', 'item.completed' => $this->parseItem($data, substr($type, 5)),
-            default => [new UnknownEvent($type, $data)],
+            'error' => [new ErrorEvent(self::message($data), $raw)],
+            'item.started', 'item.updated', 'item.completed' => $this->parseItem($data, substr($type, 5), $raw),
+            default => [new UnknownEvent($type, $raw)],
         };
     }
 
     /**
      * @param array<string, mixed> $event
+     * @param array<string, mixed> $raw
      * @return list<CodexEvent>
      */
-    private function parseItem(array $event, string $phase): array
+    private function parseItem(array $event, string $phase, array $raw): array
     {
         $item = self::map($event['item'] ?? []);
         $itemType = is_string($item['type'] ?? null) ? $item['type'] : '';
@@ -132,10 +142,10 @@ final class JsonlEventParser
                 status: self::nullableString($item['status'] ?? $event['status'] ?? null),
                 tool: self::nullableString($item['tool'] ?? $event['tool'] ?? null),
                 phase: $phase,
-                raw: $event,
+                raw: $raw,
             )],
-            'agent_message' => [new AgentMessage($id, self::string($item['text'] ?? $item['message'] ?? ''), $phase, $event)],
-            'reasoning' => [new Reasoning($id, self::string($item['text'] ?? $item['summary'] ?? ''), $phase, $event)],
+            'agent_message' => [new AgentMessage($id, self::string($item['text'] ?? $item['message'] ?? ''), $phase, $raw)],
+            'reasoning' => [new Reasoning($id, self::string($item['text'] ?? $item['summary'] ?? ''), $phase, $raw)],
             'command_execution' => [new CommandExecution(
                 id: $id,
                 command: self::string($item['command'] ?? ''),
@@ -143,20 +153,20 @@ final class JsonlEventParser
                 output: self::string($item['aggregated_output'] ?? $item['output'] ?? ''),
                 exitCode: is_numeric($item['exit_code'] ?? null) ? (int) $item['exit_code'] : null,
                 phase: $phase,
-                raw: $event,
+                raw: $raw,
             )],
-            'file_change' => $this->parseFileChanges($event, $item, $id, $phase),
-            'todo_list', 'plan_update' => [new TodoList($id, self::listOfMaps($item['items'] ?? $item['todos'] ?? []), $phase, $event)],
-            default => [new UnknownEvent($itemType === '' ? (string) ($event['type'] ?? '') : $itemType, $event)],
+            'file_change' => $this->parseFileChanges($item, $id, $phase, $raw),
+            'todo_list', 'plan_update' => [new TodoList($id, self::listOfMaps($item['items'] ?? $item['todos'] ?? []), $phase, $raw)],
+            default => [new UnknownEvent($itemType === '' ? (string) ($event['type'] ?? '') : $itemType, $raw)],
         };
     }
 
     /**
-     * @param array<string, mixed> $event
      * @param array<string, mixed> $item
+     * @param array<string, mixed> $raw
      * @return list<CodexEvent>
      */
-    private function parseFileChanges(array $event, array $item, string $id, string $phase): array
+    private function parseFileChanges(array $item, string $id, string $phase, array $raw): array
     {
         $changes = self::listOfMaps($item['changes'] ?? []);
         if ($changes === []) {
@@ -173,7 +183,7 @@ final class JsonlEventParser
                 path: self::string($change['path'] ?? ''),
                 kind: FileChangeKind::fromCodex($change['kind'] ?? null),
                 phase: $phase,
-                raw: $event,
+                raw: $raw,
             );
         }
 

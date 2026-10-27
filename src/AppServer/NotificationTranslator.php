@@ -28,7 +28,10 @@ final class NotificationTranslator
     {
         $params = $notification->params;
 
-        return match ($notification->method) {
+        $event = match ($notification->method) {
+            'account/rateLimits/updated' => is_array($params['rateLimits'] ?? null) && $params['rateLimits'] !== []
+                ? ['type' => 'account.rate_limits.updated', 'rate_limits' => $params, 'raw' => $notification->raw]
+                : $this->unknown($notification),
             'thread/started' => $this->threadStarted($params),
             'turn/started' => $this->turnStarted($params),
             'turn/completed' => $this->turnCompleted($params),
@@ -43,6 +46,10 @@ final class NotificationTranslator
             'item/updated' => $this->item($notification, 'updated'),
             default => $this->unknown($notification),
         };
+
+        $event['raw'] = $notification->raw;
+
+        return $event;
     }
 
     /**
@@ -84,13 +91,14 @@ final class NotificationTranslator
         $error = $this->map($turn['error'] ?? []);
         $threadId = $this->string($params['threadId'] ?? $params['thread_id'] ?? '');
         $turnId = $this->string($turn['id'] ?? $params['turnId'] ?? $params['turn_id'] ?? '');
+        $status = $this->string($turn['status'] ?? 'completed');
 
-        // A turn the server reports as failed is a failure even though the
-        // notification that carried it is the completion one.
-        if (($turn['status'] ?? null) === 'failed' || $error !== []) {
+        // Completion is terminal, but only the completed status is success.
+        if ($status !== 'completed' || $error !== []) {
             return [
                 'type' => 'turn.failed',
-                'message' => $this->string($error['message'] ?? 'The turn failed.'),
+                'message' => $this->string($error['message'] ?? ($status === 'interrupted' ? 'The turn was interrupted.' : 'The turn failed.')),
+                'status' => $status,
                 'thread_id' => $threadId,
                 'turn_id' => $turnId,
             ];
@@ -166,7 +174,7 @@ final class NotificationTranslator
                 'type' => 'command_execution',
                 'id' => $item['id'] ?? '',
                 'command' => $item['command'] ?? '',
-                'status' => $item['status'] ?? null,
+                'status' => ($item['status'] ?? null) === 'inProgress' ? 'in_progress' : ($item['status'] ?? null),
                 'aggregated_output' => $item['aggregatedOutput'] ?? '',
                 'exit_code' => $item['exitCode'] ?? null,
             ],
@@ -261,12 +269,13 @@ final class NotificationTranslator
 
         foreach ($changes as $path => $change) {
             $change = $this->map($change);
+            $kind = $change['kind'] ?? ($change['type'] ?? null);
 
-            // The app server keys changes by path; the JSONL stream carries the
-            // path inside each entry.
+            // Current servers send a list with object kinds; older payloads
+            // may key changes by path and use string kinds.
             $translated[] = [
                 'path' => is_string($path) ? $path : $this->string($change['path'] ?? ''),
-                'kind' => $change['kind'] ?? ($change['type'] ?? null),
+                'kind' => is_array($kind) ? ($kind['type'] ?? null) : $kind,
             ];
         }
 

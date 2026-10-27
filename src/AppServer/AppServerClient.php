@@ -119,6 +119,33 @@ final class AppServerClient
     }
 
     /**
+     * Branches an existing thread's stored history and returns the new ID.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function threadFork(string $threadId, array $params = []): string
+    {
+        if (trim($threadId) === '') {
+            throw new \InvalidArgumentException('The parent thread ID must not be empty.');
+        }
+
+        $this->initialize();
+        $result = $this->connection->request('thread/fork', array_merge(
+            ['excludeTurns' => true],
+            $params,
+            ['threadId' => $threadId],
+        ));
+        $thread = is_array($result) ? ($result['thread'] ?? null) : null;
+        $id = is_array($thread) ? ($thread['id'] ?? null) : null;
+
+        if (!is_string($id) || $id === '' || $id === $threadId) {
+            throw new AppServerException('The Codex app server forked a thread without a new thread ID.');
+        }
+
+        return $id;
+    }
+
+    /**
      * Starts a turn and returns its ID. The work itself arrives as
      * notifications afterwards.
      *
@@ -132,6 +159,27 @@ final class AppServerClient
 
         if (!is_string($id) || $id === '') {
             throw new AppServerException('The Codex app server started a turn without naming it.');
+        }
+
+        return $id;
+    }
+
+    /**
+     * Adds input to the named active turn without starting another one.
+     *
+     * @param list<array<string, mixed>> $input
+     */
+    public function turnSteer(string $threadId, string $expectedTurnId, array $input): string
+    {
+        $result = $this->connection->request('turn/steer', [
+            'threadId' => $threadId,
+            'expectedTurnId' => $expectedTurnId,
+            'input' => $input,
+        ]);
+        $id = is_array($result) ? ($result['turnId'] ?? null) : null;
+
+        if (!is_string($id) || $id !== $expectedTurnId) {
+            throw new AppServerException('The Codex app server did not acknowledge steering the expected turn.');
         }
 
         return $id;

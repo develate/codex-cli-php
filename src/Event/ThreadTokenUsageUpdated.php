@@ -6,7 +6,7 @@ namespace Develate\CodexCli\Event;
 
 use Develate\CodexCli\Value\Usage;
 
-/** A pair of per-turn and cumulative token-usage snapshots from the app server. */
+/** Last-response and cumulative token-usage snapshots from the app server. */
 final readonly class ThreadTokenUsageUpdated implements CodexEvent
 {
     /** @param array<string, mixed> $raw */

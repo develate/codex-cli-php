@@ -17,6 +17,7 @@ use Develate\CodexCli\Process\ProcessResult;
 use Develate\CodexCli\Value\ApprovalDecision;
 use Develate\CodexCli\Value\ElicitationAction;
 use Develate\CodexCli\Value\Sandbox;
+use Develate\CodexCli\Value\Usage;
 
 /**
  * Runs a turn over the app server's bidirectional connection.
@@ -32,8 +33,16 @@ use Develate\CodexCli\Value\Sandbox;
  *
  * @see https://developers.openai.com/codex/app-server
  */
-final class AppServerTurnTransport implements Transport
+final class AppServerTurnTransport implements SteerableTransport
 {
+    private const USAGE_FIELDS = [
+        'input_tokens' => 'inputTokens',
+        'cached_input_tokens' => 'cachedInputTokens',
+        'cache_write_input_tokens' => 'cacheWriteInputTokens',
+        'output_tokens' => 'outputTokens',
+        'reasoning_output_tokens' => 'reasoningOutputTokens',
+    ];
+
     /** @var (callable(ApprovalRequest): ApprovalDecision)|null */
     private $approvalHandler = null;
 
@@ -42,6 +51,9 @@ final class AppServerTurnTransport implements Transport
 
     /** @var (callable(PermissionRequest): PermissionResponse)|null */
     private $permissionHandler = null;
+
+    /** @var (callable(): void)|null */
+    private $tickHandler = null;
 
     private ?AppServerClient $client = null;
 
@@ -54,6 +66,12 @@ final class AppServerTurnTransport implements Transport
     private bool $turnFinished = false;
 
     private bool $turnStartedEventEmitted = false;
+
+    /** @var array<string, int> */
+    private array $usageFloor = [];
+
+    /** @var array<string, int> */
+    private array $usageCeiling = [];
 
     /**
      * @param array<string, string> $configOverrides
@@ -101,11 +119,52 @@ final class AppServerTurnTransport implements Transport
         return $this->threadId;
     }
 
+    public function turnId(): ?string
+    {
+        return $this->turnId;
+    }
+
+    /**
+     * Runs between reads, including while the agent is silently thinking.
+     *
+     * @param (callable(): void)|null $handler
+     */
+    public function onTick(?callable $handler): void
+    {
+        $this->tickHandler = $handler;
+    }
+
+    /** @param list<string> $images */
+    public function steer(string $prompt, array $images = []): string
+    {
+        if ($this->client === null || $this->threadId === null || $this->turnId === null || $this->turnFinished) {
+            throw new \LogicException('Steering requires an active interactive turn.');
+        }
+
+        if (trim($prompt) === '' && $images === []) {
+            throw new \InvalidArgumentException('A steering message must contain text or images.');
+        }
+
+        $input = [['type' => 'text', 'text' => $prompt]];
+        foreach ($images as $image) {
+            $input[] = ['type' => 'localImage', 'path' => $image];
+        }
+
+        return $this->client->turnSteer($this->threadId, $this->turnId, $input);
+    }
+
     /**
      * @return \Generator<int, CodexEvent, void, ProcessResult>
      */
     public function stream(RunRequest $request): \Generator
     {
+        if ($this->connection !== null) {
+            throw new \LogicException('This transport already has a turn running.');
+        }
+        if ($request->mode !== RunMode::Start && ($request->threadId === null || $request->threadId === '')) {
+            throw new \LogicException('Resume and fork runs require a thread id.');
+        }
+
         $this->connection = new JsonRpcConnection($this->binary, $this->requestTimeout, $this->configOverrides, $this->env);
         $this->client = new AppServerClient($this->connection);
         $this->client->onServerRequest(fn (ServerRequest $serverRequest): array => $this->answer($serverRequest));
@@ -113,11 +172,17 @@ final class AppServerTurnTransport implements Transport
         $deadline = microtime(true) + ($request->timeout ?? 3600.0);
         $this->turnFinished = false;
         $this->turnStartedEventEmitted = false;
+        $this->turnId = null;
+        $this->usageFloor = [];
+        $this->usageCeiling = [];
 
         try {
-            $this->threadId = $request->threadId !== null && $request->mode === RunMode::Resume
-                ? $this->client->threadResume($request->threadId, $this->threadParams($request))
-                : $this->client->threadStart($this->threadParams($request));
+            $params = $this->threadParams($request);
+            $this->threadId = match ($request->mode) {
+                RunMode::Start => $this->client->threadStart($params),
+                RunMode::Resume => $this->client->threadResume($request->threadId, $params),
+                RunMode::Fork => $this->client->threadFork($request->threadId, $params),
+            };
 
             // Emitted here rather than waited for: the caller stores this ID to
             // resume the thread later, and a `thread/started` notification only
@@ -136,34 +201,16 @@ final class AppServerTurnTransport implements Transport
                 'turn_id' => $this->turnId,
             ]);
 
-            yield from $this->drain();
-
             while (microtime(true) < $deadline) {
-                if (! $this->client->pump($this->slice($deadline))) {
-                    continue;
-                }
-
-                $finished = false;
-
-                foreach ($this->client->drain() as $notification) {
-                    $translated = $this->translator->translate($notification);
-
-                    if ($translated['type'] === 'turn.started' && $this->turnStartedEventEmitted) {
-                        continue;
-                    }
-
-                    yield from $this->events($translated);
-
-                    if (in_array($translated['type'], ['turn.completed', 'turn.failed'], true)) {
-                        $finished = true;
-                    }
-                }
-
-                if ($finished) {
-                    $this->turnFinished = true;
-
+                if (yield from $this->drain()) {
                     return new ProcessResult(0, '');
                 }
+
+                if ($this->tickHandler !== null) {
+                    ($this->tickHandler)();
+                }
+
+                $this->client->pump($this->slice($deadline));
             }
 
             throw new AppServerException('The Codex turn did not finish within its timeout.');
@@ -185,20 +232,90 @@ final class AppServerTurnTransport implements Transport
         }
     }
 
+    /** @return array<string, mixed> */
+    private function translate(Notification $notification): array
+    {
+        $event = $this->translator->translate($notification);
+        $currentTurn = ($event['thread_id'] ?? null) === $this->threadId
+            && ($event['turn_id'] ?? null) === $this->turnId;
+
+        if ($currentTurn && $event['type'] === 'thread.token_usage.updated') {
+            $last = Usage::fromArray($event['last_usage']);
+            $total = Usage::fromArray($event['total_usage']);
+
+            // `last` is one model response; `total` includes prior turns.
+            // The earliest pre-response total and latest cumulative total
+            // account for repeated or out-of-order notifications.
+            foreach (self::USAGE_FIELDS as $wireName => $property) {
+                $before = max(0, $total->$property - $last->$property);
+                $this->usageFloor[$wireName] = isset($this->usageFloor[$wireName])
+                    ? min($this->usageFloor[$wireName], $before) : $before;
+                $this->usageCeiling[$wireName] = max($this->usageCeiling[$wireName] ?? 0, $total->$property);
+            }
+        }
+
+        if ($currentTurn && $event['type'] === 'turn.completed'
+            && $event['usage'] === [] && $this->usageFloor !== []) {
+            foreach (self::USAGE_FIELDS as $wireName => $_) {
+                $event['usage'][$wireName] = max(0, $this->usageCeiling[$wireName] - $this->usageFloor[$wireName]);
+            }
+        }
+
+        return $event;
+    }
+
     /**
-     * @return \Generator<int, CodexEvent, void, void>
+     * @return \Generator<int, CodexEvent, void, bool>
      */
     private function drain(): \Generator
     {
+        $finished = false;
         foreach ($this->client?->drain() ?? [] as $notification) {
-            $translated = $this->translator->translate($notification);
+            $translated = $this->translate($notification);
 
             if ($translated['type'] === 'turn.started' && $this->turnStartedEventEmitted) {
                 continue;
             }
 
+            if ($this->belongsToAnotherThread($notification, $translated)) {
+                continue;
+            }
+
+            if (in_array($translated['type'], ['turn.completed', 'turn.failed'], true)) {
+                $this->turnFinished = true;
+                $finished = true;
+            }
+
             yield from $this->events($translated);
         }
+
+        return $finished;
+    }
+
+    /**
+     * Whether a notification is a sub-agent's own lifecycle or item event.
+     *
+     * Spawned agents run as threads of their own on the same connection. Their
+     * turn ending is not this turn ending, and their messages are not this
+     * agent's answer. Their spawn calls, token usage and reroutes still pass:
+     * those describe the sub-agent from the outside rather than speak for the
+     * root thread.
+     *
+     * @param  array<string, mixed>  $translated
+     */
+    private function belongsToAnotherThread(Notification $notification, array $translated): bool
+    {
+        $type = $translated['type'];
+        if (! in_array($type, ['thread.started', 'turn.started', 'turn.completed', 'turn.failed'], true)
+            && ! str_starts_with($type, 'item.')) {
+            return false;
+        }
+
+        $params = $notification->params;
+        $thread = is_array($params['thread'] ?? null) ? $params['thread'] : [];
+        $threadId = $params['threadId'] ?? $params['thread_id'] ?? $thread['id'] ?? null;
+
+        return is_string($threadId) && $threadId !== '' && $threadId !== $this->threadId;
     }
 
     /**

@@ -15,7 +15,9 @@ use Develate\CodexCli\Event\TurnCompleted;
 use Develate\CodexCli\Event\TurnFailed;
 use Develate\CodexCli\Event\TurnStarted;
 use Develate\CodexCli\Event\UnknownEvent;
+use Develate\CodexCli\Exception\AppServerException;
 use Develate\CodexCli\Exception\UnsupportedApproval;
+use Develate\CodexCli\Thread;
 use Develate\CodexCli\Transport\ApprovalRequest;
 use Develate\CodexCli\Transport\AppServerTurnTransport;
 use Develate\CodexCli\Transport\ElicitationResponse;
@@ -26,6 +28,7 @@ use Develate\CodexCli\Transport\RunRequest;
 use Develate\CodexCli\Value\ApprovalDecision;
 use Develate\CodexCli\Value\ElicitationAction;
 use Develate\CodexCli\Value\Sandbox;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -54,7 +57,7 @@ final class AppServerTurnTransportTest extends TestCase
                 'type' => 'commandExecution', 'id' => 'c1', 'command' => 'ls',
                 'status' => 'completed', 'aggregatedOutput' => 'README.md', 'exitCode' => 0,
             ]]),
-            $this->notification('turn/completed', ['threadId' => 't1', 'turn' => [
+            $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => [
                 'id' => 'turn-1', 'status' => 'completed', 'items' => [],
                 'usage' => ['input_tokens' => 10, 'output_tokens' => 3],
             ]]),
@@ -73,20 +76,21 @@ final class AppServerTurnTransportTest extends TestCase
         self::assertSame('ls', $events[3]->command);
         self::assertSame('README.md', $events[3]->output);
         self::assertInstanceOf(TurnCompleted::class, $events[4]);
-        self::assertSame('t1', $events[4]->threadId);
+        self::assertSame('thread-1', $events[4]->threadId);
         self::assertSame('turn-1', $events[4]->turnId);
+        self::assertSame(10, $events[4]->usage->inputTokens);
     }
 
     public function testStreamsCollaborationIdentityAndEveryTokenUsageSnapshot(): void
     {
         $binary = $this->fakeAppServer([
             $this->notification('item/started', [
-                'threadId' => 'root-thread',
-                'turnId' => 'root-turn',
+                'threadId' => 'thread-1',
+                'turnId' => 'turn-1',
                 'item' => [
                     'type' => 'collabToolCall',
                     'id' => 'spawn-one',
-                    'senderThreadId' => 'root-thread',
+                    'senderThreadId' => 'thread-1',
                     'receiverThreadId' => 'child-one',
                     'model' => 'gpt-5.6-luna',
                     'status' => 'inProgress',
@@ -130,13 +134,13 @@ final class AppServerTurnTransportTest extends TestCase
                 'reason' => 'highRiskCyberActivity',
             ]),
             $this->notification('item/updated', [
-                'threadId' => 'root-thread',
-                'turnId' => 'root-turn',
+                'threadId' => 'thread-1',
+                'turnId' => 'turn-1',
                 'item' => ['type' => 'futureItem', 'id' => 'future-1'],
             ]),
-            $this->notification('thread/future', ['threadId' => 'root-thread']),
-            $this->notification('turn/completed', ['threadId' => 'root-thread', 'turn' => [
-                'id' => 'root-turn', 'status' => 'completed', 'items' => [],
+            $this->notification('thread/future', ['threadId' => 'thread-1']),
+            $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => [
+                'id' => 'turn-1', 'status' => 'completed', 'items' => [],
             ]]),
         ]);
 
@@ -155,7 +159,7 @@ final class AppServerTurnTransportTest extends TestCase
         ));
 
         self::assertCount(2, $collaboration);
-        self::assertSame('root-thread', $collaboration[0]->senderThreadId);
+        self::assertSame('thread-1', $collaboration[0]->senderThreadId);
         self::assertSame(['child-one'], $collaboration[0]->receiverThreadIds);
         self::assertSame('gpt-5.6-luna', $collaboration[0]->requestedModel);
         self::assertSame('inProgress', $collaboration[0]->status);
@@ -187,6 +191,107 @@ final class AppServerTurnTransportTest extends TestCase
         self::assertSame('futureItem', $unknown[0]->raw()['params']['item']['type']);
     }
 
+    public function testASubAgentFinishingDoesNotEndOrSpeakForTheRootTurn(): void
+    {
+        $binary = $this->fakeAppServer([
+            $this->notification('item/completed', [
+                'threadId' => 'thread-1',
+                'turnId' => 'turn-1',
+                'item' => [
+                    'type' => 'collabAgentToolCall', 'id' => 'spawn', 'senderThreadId' => 'thread-1',
+                    'receiverThreadId' => 'child', 'status' => 'completed', 'tool' => 'spawnAgent',
+                ],
+            ]),
+            $this->notification('thread/started', ['thread' => ['id' => 'child']]),
+            $this->notification('turn/started', ['threadId' => 'child', 'turn' => ['id' => 'child-turn']]),
+            $this->notification('item/completed', ['threadId' => 'child', 'turnId' => 'child-turn', 'item' => [
+                'type' => 'agentMessage', 'id' => 'child-message', 'text' => 'Handed the notes to the main agent.',
+            ]]),
+            $this->notification('thread/tokenUsage/updated', [
+                'threadId' => 'child',
+                'turnId' => 'child-turn',
+                'tokenUsage' => ['last' => ['inputTokens' => 5], 'total' => ['inputTokens' => 5]],
+            ]),
+            $this->notification('turn/completed', ['threadId' => 'child', 'turn' => [
+                'id' => 'child-turn', 'status' => 'completed', 'items' => [],
+            ]]),
+            $this->notification('item/completed', ['threadId' => 'thread-1', 'turnId' => 'turn-1', 'item' => [
+                'type' => 'agentMessage', 'id' => 'root-message', 'text' => 'Done.',
+            ]]),
+            $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => [
+                'id' => 'turn-1', 'status' => 'completed', 'items' => [],
+            ]]),
+        ]);
+
+        $events = $this->collect(new AppServerTurnTransport($binary), $this->request());
+        $of = static fn (string $class): array => array_values(array_filter(
+            $events,
+            static fn (CodexEvent $event): bool => $event instanceof $class,
+        ));
+
+        self::assertSame(['Done.'], array_map(static fn (AgentMessage $message): string => $message->text, $of(AgentMessage::class)));
+        self::assertSame(['thread-1'], array_map(static fn (ThreadStarted $event): string => $event->threadId, $of(ThreadStarted::class)));
+        self::assertCount(1, $of(TurnStarted::class));
+        self::assertCount(1, $of(CollaborationToolCall::class));
+        self::assertCount(1, $of(ThreadTokenUsageUpdated::class), 'Sub-agent usage stays observable.');
+
+        $completed = $of(TurnCompleted::class);
+        self::assertCount(1, $completed);
+        self::assertSame('turn-1', $completed[0]->turnId);
+        self::assertNotContains('turn/interrupt', array_column($this->requests($binary), 'method'));
+    }
+
+    public function testTurnUsageComesFromRootTokenSnapshotsWithoutCountingRepeatsOrPriorTurns(): void
+    {
+        $later = $this->notification('thread/tokenUsage/updated', [
+            'threadId' => 'thread-1', 'turnId' => 'turn-1',
+            'tokenUsage' => [
+                'last' => ['inputTokens' => 20, 'cachedInputTokens' => 3, 'cacheWriteInputTokens' => 2, 'outputTokens' => 7, 'reasoningOutputTokens' => 3],
+                'total' => ['inputTokens' => 130, 'cachedInputTokens' => 8, 'cacheWriteInputTokens' => 5, 'outputTokens' => 17, 'reasoningOutputTokens' => 9],
+            ],
+        ]);
+        $earlier = $this->notification('thread/tokenUsage/updated', [
+            'threadId' => 'thread-1', 'turnId' => 'turn-1',
+            'tokenUsage' => [
+                'last' => ['inputTokens' => 10, 'cachedInputTokens' => 1, 'cacheWriteInputTokens' => 1, 'outputTokens' => 2, 'reasoningOutputTokens' => 1],
+                'total' => ['inputTokens' => 110, 'cachedInputTokens' => 5, 'cacheWriteInputTokens' => 3, 'outputTokens' => 10, 'reasoningOutputTokens' => 6],
+            ],
+        ]);
+        $binary = $this->fakeAppServer([
+            $later,
+            $later,
+            $this->notification('thread/tokenUsage/updated', [
+                'threadId' => 'child-thread', 'turnId' => 'child-turn',
+                'tokenUsage' => [
+                    'last' => ['inputTokens' => 500, 'outputTokens' => 200],
+                    'total' => ['inputTokens' => 500, 'outputTokens' => 200],
+                ],
+            ]),
+            $earlier,
+            $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => [
+                'id' => 'turn-1', 'status' => 'completed', 'items' => [],
+            ]]),
+        ]);
+        $completed = null;
+        $thread = new Thread(new AppServerTurnTransport($binary), '0.157.1', sys_get_temp_dir(), null, Sandbox::WorkspaceWrite);
+        $thread->onEvent(static function (CodexEvent $event) use (&$completed): void {
+            if ($event instanceof TurnCompleted) {
+                $completed = $event;
+            }
+        });
+
+        $result = $thread->run('Do the thing');
+
+        self::assertSame(30, $result->usage->inputTokens);
+        self::assertSame(4, $result->usage->cachedInputTokens);
+        self::assertSame(3, $result->usage->cacheWriteInputTokens);
+        self::assertSame(9, $result->usage->outputTokens);
+        self::assertSame(4, $result->usage->reasoningOutputTokens);
+        self::assertInstanceOf(TurnCompleted::class, $completed);
+        self::assertSame(30, $completed->usage->inputTokens);
+        self::assertSame(9, $completed->usage->outputTokens);
+    }
+
     public function testACommandApprovalIsAnsweredWhileTheAgentWaits(): void
     {
         $binary = $this->fakeAppServer([
@@ -195,7 +300,7 @@ final class AppServerTurnTransportTest extends TestCase
                 'command' => 'rm -rf build',
                 'cwd' => '/tmp/project',
             ]),
-            $this->notification('turn/completed', ['threadId' => 't1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
+            $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
         ]);
 
         $asked = [];
@@ -218,7 +323,7 @@ final class AppServerTurnTransportTest extends TestCase
     {
         $binary = $this->fakeAppServer([
             $this->serverRequest('item/fileChange/requestApproval', ['itemId' => 'f1', 'reason' => 'write outside workspace']),
-            $this->notification('turn/completed', ['threadId' => 't1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
+            $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
         ]);
 
         $transport = new AppServerTurnTransport($binary);
@@ -246,7 +351,7 @@ final class AppServerTurnTransportTest extends TestCase
                 'reason' => 'Select a workspace root',
                 'permissions' => $permissions,
             ]),
-            $this->notification('turn/completed', ['threadId' => 't1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
+            $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
         ]);
 
         $asked = [];
@@ -281,7 +386,7 @@ final class AppServerTurnTransportTest extends TestCase
                 'cwd' => '/tmp/project',
                 'permissions' => ['network' => ['enabled' => true]],
             ]),
-            $this->notification('turn/completed', ['threadId' => 't1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
+            $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
         ]);
 
         $transport = new AppServerTurnTransport($binary);
@@ -420,7 +525,7 @@ final class AppServerTurnTransportTest extends TestCase
     public function testAFailedTurnIsReportedAsAFailure(): void
     {
         $binary = $this->fakeAppServer([
-            $this->notification('turn/completed', ['threadId' => 't1', 'turn' => [
+            $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => [
                 'id' => 'turn-1', 'status' => 'failed', 'items' => [],
                 'error' => ['message' => 'The model refused.'],
             ]]),
@@ -436,7 +541,7 @@ final class AppServerTurnTransportTest extends TestCase
     public function testResumingSendsTheThreadIdRatherThanStartingANewThread(): void
     {
         $binary = $this->fakeAppServer([
-            $this->notification('turn/completed', ['threadId' => 't1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
+            $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
         ]);
 
         $this->collect(new AppServerTurnTransport($binary), $this->request(mode: RunMode::Resume, threadId: 'existing-thread'));
@@ -447,11 +552,107 @@ final class AppServerTurnTransportTest extends TestCase
         self::assertNotContains('thread/start', $methods);
     }
 
+    public function testForkingUsesTheParentIdAndResumesTheReturnedChild(): void
+    {
+        $binary = $this->fakeAppServer([
+            $this->notification('turn/completed', ['threadId' => 'child-thread', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
+        ], [
+            'thread/start' => ['thread' => ['id' => 'child-thread']],
+            'thread/fork' => ['thread' => ['id' => 'child-thread', 'forkedFromId' => 'parent-thread']],
+            'thread/resume' => ['thread' => ['id' => 'child-thread']],
+        ]);
+        $parent = new Thread(new AppServerTurnTransport($binary), '0.160.0', sys_get_temp_dir(), 'gpt-test', Sandbox::WorkspaceWrite, threadId: 'parent-thread');
+        $child = $parent->fork();
+        $first = $child->run('Try an alternative');
+        $second = $child->run('Continue the alternative');
+        $requests = $this->requests($binary);
+        $forks = array_values(array_filter($requests, static fn (array $message): bool => ($message['method'] ?? null) === 'thread/fork'));
+        $resumes = array_values(array_filter($requests, static fn (array $message): bool => ($message['method'] ?? null) === 'thread/resume'));
+
+        self::assertCount(1, $forks);
+        self::assertSame('parent-thread', $forks[0]['params']['threadId']);
+        self::assertTrue($forks[0]['params']['excludeTurns']);
+        self::assertSame('gpt-test', $forks[0]['params']['model']);
+        self::assertSame('workspace-write', $forks[0]['params']['sandbox']);
+        self::assertCount(1, $resumes);
+        self::assertSame('child-thread', $resumes[0]['params']['threadId']);
+        self::assertSame('parent-thread', $parent->id());
+        self::assertSame('child-thread', $first->threadId);
+        self::assertSame('child-thread', $second->threadId);
+        self::assertNotContains('thread/start', array_column($requests, 'method'));
+    }
+
+    public function testInterruptedTurnsRemainObservableAsErrorsInTheResult(): void
+    {
+        $completion = $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => [
+            'id' => 'turn-1', 'status' => 'interrupted', 'items' => [], 'error' => null,
+        ]]);
+        $binary = $this->fakeAppServer([$completion]);
+        $thread = new Thread(new AppServerTurnTransport($binary), '0.160.0', sys_get_temp_dir(), null, Sandbox::ReadOnly);
+
+        $result = $thread->run('Do the thing');
+
+        self::assertCount(1, $result->errors());
+        self::assertInstanceOf(TurnFailed::class, $result->errors()[0]);
+        self::assertSame('interrupted', $result->errors()[0]->status);
+        self::assertSame($completion, $result->errors()[0]->raw());
+        self::assertNotContains('turn/interrupt', array_column($this->requests($binary), 'method'));
+    }
+
+    public function testCancellingAnApprovalReportsTheInterruptedTurn(): void
+    {
+        $binary = $this->fakeAppServer([
+            $this->serverRequest('item/commandExecution/requestApproval', ['threadId' => 'thread-1', 'turnId' => 'turn-1', 'itemId' => 'command-1', 'command' => 'pwd']),
+            $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => ['id' => 'turn-1', 'status' => 'interrupted', 'items' => [], 'error' => null]]),
+        ]);
+        $transport = new AppServerTurnTransport($binary);
+        $transport->onApproval(static fn (ApprovalRequest $request): ApprovalDecision => ApprovalDecision::Cancel);
+        $thread = new Thread($transport, '0.160.0', sys_get_temp_dir(), null, Sandbox::ReadOnly);
+
+        $result = $thread->run('Do the thing');
+
+        self::assertSame(['cancel'], $this->decisions($binary));
+        self::assertCount(1, $result->errors());
+        self::assertSame('interrupted', $result->errors()[0]->status);
+        self::assertNotContains('turn/interrupt', array_column($this->requests($binary), 'method'));
+    }
+
+    #[DataProvider('invalidForkResponses')]
+    public function testForkRejectsAnInvalidChildId(array $response): void
+    {
+        $binary = $this->fakeAppServer([], ['thread/fork' => $response]);
+
+        $this->expectException(AppServerException::class);
+        $this->expectExceptionMessage('without a new thread ID');
+        $this->collect(new AppServerTurnTransport($binary), $this->request(RunMode::Fork, 'parent-thread'));
+    }
+
+    public static function invalidForkResponses(): iterable
+    {
+        yield 'missing id' => [[]];
+        yield 'empty id' => [['thread' => ['id' => '']]];
+        yield 'parent id reused' => [['thread' => ['id' => 'parent-thread']]];
+    }
+
+    #[DataProvider('missingThreadIds')]
+    public function testForkRequiresAParentBeforeStartingTheServer(?string $threadId): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('require a thread id');
+        $this->collect(new AppServerTurnTransport('/does-not-exist/codex'), $this->request(RunMode::Fork, $threadId));
+    }
+
+    public static function missingThreadIds(): iterable
+    {
+        yield 'null' => [null];
+        yield 'empty' => [''];
+    }
+
     public function testAbandoningTheStreamInterruptsTheTurn(): void
     {
         $binary = $this->fakeAppServer([
             $this->notification('item/started', ['item' => ['type' => 'agentMessage', 'id' => 'i1', 'text' => 'Thinking']]),
-            $this->notification('turn/completed', ['threadId' => 't1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
+            $this->notification('turn/completed', ['threadId' => 'thread-1', 'turn' => ['id' => 'turn-1', 'status' => 'completed', 'items' => []]]),
         ]);
 
         $stream = (new AppServerTurnTransport($binary))->stream($this->request());
@@ -554,8 +755,9 @@ final class AppServerTurnTransportTest extends TestCase
      * then plays a scripted sequence of notifications and server requests.
      *
      * @param  list<array<string, mixed>>  $script
+     * @param  array<string, array<string, mixed>>  $responses
      */
-    private function fakeAppServer(array $script): string
+    private function fakeAppServer(array $script, array $responses = []): string
     {
         $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'codex-turn-'.bin2hex(random_bytes(8));
         mkdir($directory);
@@ -566,6 +768,7 @@ final class AppServerTurnTransportTest extends TestCase
         $body = strtr(<<<'PHP'
         <?php
         $script = json_decode(__SCRIPT__, true);
+        $responses = json_decode(__RESPONSES__, true);
         $log = __LOG__;
         $nextId = 9000;
         $emit = static function (array $message) use ($log): void {
@@ -596,7 +799,7 @@ final class AppServerTurnTransportTest extends TestCase
             if (! isset($message['id'])) {
                 continue;
             }
-            $result = match ($message['method']) {
+            $result = $responses[$message['method']] ?? match ($message['method']) {
                 'initialize' => ['userAgent' => 'fake'],
                 'thread/start', 'thread/resume' => ['thread' => ['id' => 'thread-1']],
                 'turn/start' => ['turn' => ['id' => 'turn-1', 'status' => 'inProgress', 'items' => []]],
@@ -607,7 +810,11 @@ final class AppServerTurnTransportTest extends TestCase
                 $play();
             }
         }
-        PHP, ['__SCRIPT__' => var_export(json_encode($script, JSON_THROW_ON_ERROR), true), '__LOG__' => var_export($log, true)]);
+        PHP, [
+            '__SCRIPT__' => var_export(json_encode($script, JSON_THROW_ON_ERROR), true),
+            '__RESPONSES__' => var_export(json_encode($responses, JSON_THROW_ON_ERROR), true),
+            '__LOG__' => var_export($log, true),
+        ]);
 
         file_put_contents($server, $body);
         file_put_contents($binary, sprintf("#!/bin/sh\nexec %s %s \"\$@\"\n", escapeshellarg(PHP_BINARY), escapeshellarg($server)));

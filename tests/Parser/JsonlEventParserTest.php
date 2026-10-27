@@ -37,6 +37,16 @@ final class JsonlEventParserTest extends TestCase
         self::assertTrue($events[0]->raw()['payload']['anything']);
     }
 
+    public function testExecPayloadWithAnAdditionalRawFieldIsNotUnwrapped(): void
+    {
+        foreach (['future.event', 'item.completed'] as $type) {
+            $raw = ['type' => $type, 'raw' => ['future' => true], 'item' => ['type' => 'agent_message', 'id' => 'message-1', 'text' => 'Done']];
+            $event = (new JsonlEventParser())->parseLine(json_encode($raw, JSON_THROW_ON_ERROR))[0];
+
+            self::assertSame($raw, $event->raw());
+        }
+    }
+
     public function testKeepsExecJsonEventsOnTheirExistingPublicClasses(): void
     {
         $parser = new JsonlEventParser();

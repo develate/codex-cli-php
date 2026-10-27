@@ -107,6 +107,9 @@ $branch = $thread->fork();
 $branch->run('Try the alternative implementation.');
 ```
 
+Interactive threads use app-server `thread/fork` to branch the parent's stored
+history, then resume the returned child thread on subsequent turns.
+
 The current Codex CLI does not accept `--cd`, `--sandbox`, or `--add-dir` on its
 resume/fork subcommands; those turns retain the thread's persisted runtime state.
 
@@ -144,6 +147,19 @@ $result = $thread->run('Work in the project and ask before expanding access.');
 Use `PermissionResponse::deny()` when the user declines. Existing command and
 file-change approvals continue to use `onApproval()`, while MCP elicitation
 requests use `onElicitation()`.
+
+While an interactive turn is running, `$thread->steer('Focus on the failing tests')`
+adds user input to that turn and returns its accepted turn ID. Pass image paths
+with `images: [...]`. Steering cannot change the turn's model or permissions,
+and an idle thread or an exec transport rejects it with `LogicException`.
+
+For input arriving from a UI or another process, register
+`$codex->turnTransport()?->onTick($callback)` before starting the stream. Read
+your application's pending input inside the callback and call `steer()` for each
+message. The callback runs between reads, including during silent reasoning.
+Server rejections are exceptions; catch them in the callback to report delivery
+failure while letting the original turn continue. Use `onTick(null)` to remove
+the callback.
 
 ## Result and usage
 
@@ -247,6 +263,12 @@ that build their own transports.
 Malformed JSONL, process startup/timeout/failure, and JSON-RPC errors raise typed
 exceptions under `Develate\CodexCli\Exception`. A syntactically valid event with an
 unknown type is not an error.
+
+For interactive turns, `TurnResult::errors()` contains `TurnFailed` for failed
+or interrupted completion. Its `status` retains the upstream status, including
+`interrupted` when an approval is cancelled, and `raw()` retains the complete
+app-server notification and structured error details. `exitCode` describes the
+transport process; a zero value alone does not establish that the turn succeeded.
 
 ## Experimental realtime voice
 

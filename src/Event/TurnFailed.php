@@ -12,6 +12,7 @@ final readonly class TurnFailed implements CodexEvent
         private array $raw,
         public ?string $threadId = null,
         public ?string $turnId = null,
+        public string $status = 'failed',
     )
     {
     }
