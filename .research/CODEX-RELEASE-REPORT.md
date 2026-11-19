@@ -2,144 +2,158 @@
 
 ## Verdict: No update needed
 
-No new required PHP compatibility fix is identified in the **assessed working
-tree** for the consumed stable-release interfaces through **0.165.0**. Two new
-stable releases, **0.164.0 and 0.165.0**, have been reviewed since the saved
-0.163.0 checkpoint. Exec arguments and JSONL remain unchanged. Consumed quota,
-credit, approval, permission, and thread/turn contracts remain usable. New account
-and error variants, image-reference alternatives, optional APIs, runtime fixes,
-and changed defaults are assessed below; a newer CLI alone does not require a
-PHP package update.
+No new required PHP compatibility fix is identified in the **current repository
+implementation** for consumed stable interfaces through **0.170.0**. Four new
+stable releases, **0.168.0, 0.169.0, 0.169.1 and 0.170.0**, have been reviewed
+since the saved 0.167.2 checkpoint. Existing exec arguments, JSONL and consumed
+app-server requests remain valid. The main behavior change is explicit project
+trust for exec configuration/MCP loading; new message display, content-token,
+account and history fields are retained raw or belong to optional APIs.
+A newer CLI alone does not require a PHP package change.
 
-The prior interactive item, raw-payload, interruption, fork, steering, usage,
-permission, and child-thread fixes remain present. Package assessment inputs are
-byte-identical to the October 19 report, and all existing tests pass again.
-These fixes remain uncommitted here; no published artifact was verified. This
-verdict does not certify a released 1.7.0 artifact. Consumer quota admission,
-richer typed features, and failed-turn usage aggregation remain watch items.
-No supported CLI minimum or range is established; reviewing a release does not
-establish support for it.
+The prior item, raw-payload, interruption, fork, steering, usage, permission and
+child-thread fixes remain present. All 102 assessment inputs are byte-identical
+to the previous report, and all existing tests pass. Consumer quota admission,
+failed-turn usage aggregation and richer presentation remain watch items.
+The latest local PHP tag **v1.8.0** predates the current fixes; this verdict does
+not certify that artifact or remote publication. **No supported CLI minimum or
+range is established; reviewing a release does not establish support for it.**
 
 ## Assessment metadata
 
-- Date of last substantive assessment: **2026-10-27** (Europe/Vienna).
+- Date of last substantive assessment: **2026-11-19** (Europe/Vienna).
 - Package repository: `code-cli/codex-cli-php`, HEAD
-  **`8bea1a39de5be49dbae28cc1077d7ad2b0056323`**; unchanged since the previous
-  assessment. Relevant working-tree state remains modified `CHANGELOG.md`,
-  `README.md`, `src/AppServer/AppServerClient.php`,
-  `src/AppServer/NotificationTranslator.php`, `src/Event/ThreadTokenUsageUpdated.php`,
-  `src/Event/TurnFailed.php`, `src/Parser/JsonlEventParser.php`, `src/Thread.php`,
-  `src/Transport/AppServerTurnTransport.php`, `tests/Parser/JsonlEventParserTest.php`,
-  and `tests/Transport/AppServerTurnTransportTest.php`; untracked
-  `src/Event/AccountRateLimitsUpdated.php`, `src/Transport/SteerableTransport.php`,
-  `tests/AppServer/NotificationTranslatorTest.php`,
-  `tests/AppServer/RateLimitsUpdatedTest.php`, and `tests/Transport/SteeringTest.php`.
-  The report was already modified before this review. HEAD alone does not
-  represent the assessed implementation. Only this report was edited.
-- Relevant package changes since the previous report: **none**. Source,
-  documentation, tests, inline fixtures, dependency declarations, and test
-  configuration match the saved fingerprint. Existing fixes and unresolved
-  findings were reassessed against the latest stable interfaces.
-- Relevant history inspected: initial SDK `1ab829f`, reset credits `93c8483`,
-  interactive approvals `f492150`, MCP elicitation `6fddfcc`, initial research
-  `e7a0e3d`, experimental realtime `2925d5c`, permissions `28a0a29`, lifecycle/
-  usage events `4f307c7`, and environment/collaboration support `8bea1a3`.
-  Initial/current requirements, version probes, test version fixtures and tags
-  were checked for baseline evidence. No applicable `AGENTS.md` was found in the
-  package, its enclosing directories, or its source/test/research subdirectories.
-  The separate `code-client/AGENTS.md` was read before the consumer reassessment.
+  **`408bfb61b4b5fd74d8e061a963b62af9d8561c25`**, unchanged from the saved report.
+  Before this run **only `.research/CODEX-RELEASE-REPORT.md` was modified**;
+  its existing November 12 contents were used as the checkpoint and preserved
+  where still relevant. Implementation, documentation, tests and dependencies
+  were clean. Only this report was edited during this assessment.
+- Relevant package changes since the previous assessment: **none**. SHA-256
+  assessment-input fingerprint **`ef996e790361fce3ac230c4957b3fd9dce2500f52de86f9fc966aaadaf39d48f`**
+  is unchanged. Computed over 102 files: all `src/**/*.php`, `tests/**/*.php`,
+  `README.md`, `CHANGELOG.md`, `composer.json`, `composer.lock` and
+  `phpunit.xml.dist`; sorted relative POSIX paths, hashing
+  `path UTF-8 + NUL + file bytes + NUL` per file. The report is excluded.
+- Current source, README, changelog, version probes, inline/fake-executable
+  fixtures and local tag/history evidence were inspected. Relevant history
+  remains initial SDK `1ab829f`, reset credits `93c8483`, interactive approvals
+  `f492150`, elicitation `6fddfcc`, initial research `e7a0e3d`, realtime
+  `2925d5c`, permissions `28a0a29`, lifecycle/usage `4f307c7`, environment/
+  collaboration `8bea1a3` and current fixes in `408bfb6`.
+  No applicable `AGENTS.md` was found in the package, its ancestors or nested
+  source/test/research directories. `code-client/AGENTS.md` was read for the
+  retained read-only consumer reassessment.
 - Fresh validation: `php vendor/bin/phpunit --do-not-cache-result --no-coverage`
   passed: **144 tests, 717 assertions**, PHP 8.5.3 / PHPUnit 11.5.56.
-  Read-only PHP payload probes also confirmed exact raw preservation for both
-  inline and file-ID image items, `modelNotFound` failure details, and explicit
-  `ordinaryUsageAllowed=false`. These probes did not add test files.
-- Installed native CLI **0.165.0** version and `exec`, `exec resume`, `exec fork`,
-  and `app-server` help probes passed, retaining used image/schema arguments
-  and `--stdio`. The PATH JavaScript launcher failed first with
-  `env: node: Bad CPU type in executable`; running its already-installed ARM64
-  native executable directly succeeded. Help printed a PATH-alias sandbox
-  warning without failing. This environment/launcher limitation is separate
-  from PHP wire compatibility; the default PATH invocation was not repaired or
-  certified. No software was installed or upgraded.
-- Package assessment-input fingerprint: SHA-256
-  **`ef996e790361fce3ac230c4957b3fd9dce2500f52de86f9fc966aaadaf39d48f`**,
-  **unchanged**. Computed over 102 files: all `src/**/*.php`, `tests/**/*.php`,
-  `README.md`, `CHANGELOG.md`, `composer.json`, `composer.lock`, and
-  `phpunit.xml.dist`; sorted by relative POSIX path, hashing
-  `path UTF-8 + NUL + file bytes + NUL` for each. This excludes the report and
-  unrelated repository files.
-- The retained consumer quota finding was reassessed read-only in `code-client`
-  HEAD **`1564f52aec7b28c35a11889bf8ad189548ef623a`**, specifically
-  `app/Agent/QuotaService.php`, `app/Agent/Providers/CodexAdapter.php`, and
-  `app/Agent/CodexEventNormalizer.php`. Those files are clean and unchanged from
-  the previous client revision `ca3082294cf293d081253b311161c28d8909c3ba`.
-  Sparse-update merging remains present; ordinary-usage admission still relies
-  on percentages. Client tests were not rerun; this is not a package baseline.
+  Read-only PHP payload probes confirm original raw preservation for moderated
+  agent messages with version-1 show/hide/block display instructions,
+  `contentTokenCount`, `inferenceHookDenied` failures, unknown notifications
+  and explicit quota `ordinaryUsageAllowed=false`. No test files were changed.
+- Installed npm manifest and existing ARM64 native executable report CLI
+  **0.170.0**. Native `exec`, `exec resume`, `exec fork` and `app-server` help
+  retain consumed arguments, including `--stdio`. **The PATH launcher fails**
+  with `Missing optional dependency @openai/codex-darwin-x64`; the native ARM64
+  binary works and emits a nonfatal PATH-alias sandbox warning. This supersedes
+  the prior working-launcher observation. No installation, upgrade or repair
+  was performed. Default-binary calls can fail until the environment is repaired
+  or an existing working executable is explicitly selected.
+- Retained consumer finding reassessed in `code-client` at unchanged HEAD
+  **`c85c99cb7cb92d8314ebe94d4daf8ed59a4c1965`**, in
+  `app/Agent/QuotaService.php`, `app/Agent/Providers/CodexAdapter.php` and
+  `app/Agent/CodexEventNormalizer.php`. Relevant files are unchanged; sparse
+  merging remains present and ordinary-usage admission still uses percentages.
+  The path-package alias remains **1.7.0**. Client tests were not rerun.
 - Tests use inline fixtures and temporary fake executables. No authenticated
-  turn/account query, credit redemption, live media session, commit, push, or
-  publication was performed. Test success is not upstream integration certification.
+  turn/account call, project-trust mutation, credit redemption, live media,
+  commit, push or publication was performed. Passing tests and help probes do
+  not establish integration support for any CLI range.
 
 ## Version distinctions and compatibility baseline
 
 | Meaning | Evidence and conclusion |
 | --- | --- |
-| PHP package version | **1.7.0** is the latest numbered `CHANGELOG.md` entry and the `code-client/composer.json` path-package alias. The package's own `composer.json` has no version field, and this checkout has no version tag. Later dated/uncommitted entries do not establish a new published version. |
-| Locally installed CLI | **0.165.0**, freshly reported by the installed native executable `/Users/thorsten/.nvm/versions/node/v22.22.2/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex --version`, matching its npm package manifest. The PATH launcher failed because Node could not execute; native version/help probes succeeded. Previous local 0.163.0 observation superseded; no upgrade performed. |
-| Latest reviewed stable upstream | **0.165.0**, [`rust-v0.165.0`](https://github.com/openai/codex/releases/tag/rust-v0.165.0), published **2026-10-27T20:09:38Z**. |
-| Supported compatibility baseline | **Unclear; no minimum or supported range is declared.** Current and initial README requirements ask for a working authenticated CLI without a version. `UnsupportedCodexVersion` remains unused; `Codex::version()` parses/caches a version but does not enforce support. `supportsInteractiveTurns()` checks transport configuration, not CLI capabilities. |
+| PHP package version | Latest local tag **v1.8.0**, pointing to `8bea1a39de5be49dbae28cc1077d7ad2b0056323` (September 19). Current HEAD is later and has no version tag. `CHANGELOG.md`'s latest numbered entry and the client path alias still say **1.7.0**; the package's own `composer.json` has no version field. Tags v1.0.0–v1.8.0 exist locally. No remote publication or installed release artifact was verified. |
+| Locally installed CLI | **0.170.0**, freshly reported by the existing native executable `/Users/thorsten/.nvm/versions/node/v22.22.2/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex --version`. The installed npm manifest also says 0.170.0. The PATH launcher currently fails because its requested darwin-x64 optional dependency is absent; the ARM64 native executable works. No upgrade or repair was performed. |
+| Latest reviewed stable upstream | **0.170.0**, [`rust-v0.170.0`](https://github.com/openai/codex/releases/tag/rust-v0.170.0), published **2026-11-18T03:40:48Z**. |
+| Supported compatibility baseline | **Unclear; no minimum or supported range is declared.** Current and initial README requirements ask for a working authenticated CLI without a version. `UnsupportedCodexVersion` remains unused; `Codex::version()` parses/caches a version but does not enforce support. `supportsInteractiveTurns()` checks transport configuration, not CLI capabilities. PHP tags do not document a Codex range. |
 
-`ThreadTest`'s `0.150.1` and the usage fixture's `0.157.1` are fake-transport
-values, not upstream integration certifications. Earlier 0.153.4, 0.157.1, and
-0.160.0 assessments are review checkpoints, not compatibility baselines.
-Because a supported baseline cannot be established from repository evidence,
-this run assesses current code against the **latest stable interfaces**, retains
-the historical reviewed range, and makes no blanket support promise for it.
-The `clientInfo.version` value **0.1.0** in `AppServerClient::initialize()` is a
-separate handshake identifier, not the PHP package or CLI version.
+`ThreadTest`'s `0.150.1` and interactive fixtures' `0.157.1`/`0.160.0` are
+fake-transport values, not integration certifications. Earlier release reviews
+are checkpoints, not compatibility baselines. Because a baseline cannot be
+established from repository evidence, this run assesses current code against the
+**latest stable interfaces**, retains the historical reviewed range and makes no
+blanket support promise for it. The `clientInfo.version` value **0.1.0** in
+`AppServerClient::initialize()` is a separate handshake identifier.
 
-The latest reviewed tag resolves to
-[commit `360319d8dee62d87e2d59fc0c21805d79519cfed`](https://github.com/openai/codex/commit/360319d8dee62d87e2d59fc0c21805d79519cfed).
+The latest reviewed annotated tag resolves to
+[commit `29eb79e9866b3262a777fdf8195c1b9e63684c91`](https://github.com/openai/codex/commit/29eb79e9866b3262a777fdf8195c1b9e63684c91).
 Baseline evidence is in [README requirements](../README.md),
 [`Codex::version()` / `supportsInteractiveTurns()`](../src/Codex.php),
-[the unused exception](../src/Exception/UnsupportedCodexVersion.php), tests, and
-initial commit `1ab829f`; none declares a tested CLI range. Experimental realtime
-remains separately conditional on installed CLI/backend capabilities.
+[the unused exception](../src/Exception/UnsupportedCodexVersion.php), tests,
+initial commit `1ab829f` and local tag history. Experimental realtime remains
+conditional on installed CLI/backend capabilities.
 
 ## Fresh upstream coverage and reviewed release range
 
-Fetched OpenAI's public [release repository](https://github.com/openai/codex/releases)
-and the unauthenticated GitHub Releases API afresh with `Cache-Control: no-cache`:
+Fetched OpenAI's public [release page](https://github.com/openai/codex/releases)
+and GitHub Releases API afresh:
 [page 1](https://api.github.com/repos/openai/codex/releases?per_page=100&page=1),
-[page 2](https://api.github.com/repos/openai/codex/releases?per_page=100&page=2), and
-[page 3](https://api.github.com/repos/openai/codex/releases?per_page=100&page=3).
-All **300 records** were enumerated, reaching stable 0.146.0, older than the saved
-0.147.0 boundary. Removed drafts and GitHub prereleases, normalized `rust-v` and
-`v` prefixes, accepted only anchored plain numeric `major.minor.patch` CLI
-versions, and sorted integer tuples. Alpha, beta, rc, preview, nightly, dev, and
-other suffixed/non-CLI versions were excluded regardless of GitHub flags or
-public visibility. Listing order was not used to establish stability or recency.
+[page 2](https://api.github.com/repos/openai/codex/releases?per_page=100&page=2),
+[page 3](https://api.github.com/repos/openai/codex/releases?per_page=100&page=3) and
+[page 4](https://api.github.com/repos/openai/codex/releases?per_page=100&page=4).
+The **400 distinct records** reach stable **0.144.2**, older than the saved
+0.147.0 inventory boundary. Filtered out drafts and GitHub prereleases,
+normalized `rust-v` and `v` prefixes, accepted only anchored plain numeric
+`major.minor.patch` CLI tags, and sorted integer tuples. Alpha, beta, rc,
+preview, nightly, dev and other suffixed/non-CLI versions were excluded even
+when public. Higher 0.171/0.172 alpha tags are not stable checkpoints.
 
-- Previous reviewed inventory: **0.147.0–0.163.0, 32 stable releases**.
-- Newly reviewed: **0.164.0 and 0.165.0**, two stable releases.
-- All 32 previous releases remain stable/public in the fetched inventory. Their
-  exact note-body SHA-256, `published_at`, and `updated_at` values are unchanged.
-- Retained reviewed range: **0.147.0–0.165.0, 34 stable releases**. Exact note
-  hashes and timestamps for all 34 releases are saved below. The fetched window
-  contains 36 plain stable versions in total; older 0.146.0/0.146.1 records do
-  not extend the reviewed range.
-- Complete, untruncated upstream Git trees were compared at **0.163.0, 0.164.0,
-  and 0.165.0** (10,157 / 10,444 / 10,519 entries). **195 downloaded tagged source
-  files** across these tags were checked against Git blob hashes. Both new full
-  release notes and relevant tagged CLI, JSONL, protocol, extension-item and
-  runtime changes were inspected. Fresh official non-interactive, app-server,
-  and command documentation was also read. Each retained package finding was
-  reassessed. This is static interface review, not runtime certification of
-  intermediate versions. Earlier pre-0.147 research remains historical context.
+- Previous reviewed inventory: **0.147.0–0.167.2, 38 stable releases**.
+- Newly reviewed: **0.168.0, 0.169.0, 0.169.1 and 0.170.0**.
+- All 38 saved releases remain stable/public. Their exact note-body SHA-256,
+  publication dates and `updated_at` values are **unchanged**.
+- Retained reviewed range: **0.147.0–0.170.0, 42 stable releases**. Exact note
+  hashes and timestamps for all 42 are saved below. The fetched window contains
+  50 plain stable versions; older records do not extend the reviewed range.
+- Compared untruncated Git trees at **0.167.2, 0.168.0, 0.169.0, 0.169.1 and
+  0.170.0** (10,866 / 11,108 / 11,312 / 11,315 / 11,347 entries). Relevant
+  exec/JSONL and app-server protocol blob identities were compared across tags;
+  changed consumed account/thread/turn/item/error definitions, exec trust,
+  JSONL emitter and relevant feature/catalog source were read. Fourteen
+  downloaded endpoint source blobs were additionally verified against Git blob
+  hashes. This does not mean every upstream changed file was read.
+- All four new full release notes were read. Sparse 0.169.1 highlights were
+  supplemented with its complete 42-file tree difference and matching compare
+  API list. That patch branch diverges from 0.169.0, so tag identities were
+  checked separately rather than assuming linear ancestry. Fresh official
+  [non-interactive](https://learn.chatgpt.com/docs/non-interactive-mode) and
+  [app-server](https://learn.chatgpt.com/docs/app-server) docs corroborate current
+  workflows; tagged code controls version-specific conclusions.
+  All retained unresolved findings were reassessed against unchanged package
+  code and the latest interfaces. No intermediate CLI is runtime-certified.
 
 | Newly reviewed stable release | Published (UTC) | Relevant assessment |
 | --- | --- | --- |
-| [0.164.0](https://github.com/openai/codex/releases/tag/rust-v0.164.0) | 2026-10-23T04:48:10Z | Saved session settings/compressed-history restoration, config-override fixes, compaction/usage corrections, MCP authentication and sandbox/runtime fixes. Exec arguments/JSONL and consumed quota/credit contracts are unchanged. File-ID image results and optional metadata/API additions are assessed below. |
-| [0.165.0](https://github.com/openai/codex/releases/tag/rust-v0.165.0) | 2026-10-27T20:09:38Z | Optional Vertex AI account/provider and attached forks; reasoning-effort and fresh-profile memory defaults; terminal model-not-found errors; agent-message interruption and MCP cancellation fixes. Existing wrapper requests remain valid; new payloads are retained. |
+| [0.168.0](https://github.com/openai/codex/releases/tag/rust-v0.168.0) | 2026-11-13T03:54:29Z | Steering/provider restoration fixes, completion content-token telemetry, optional audio and animated-image features, account-scoped history discovery. Existing consumed inputs/events remain valid. |
+| [0.169.0](https://github.com/openai/codex/releases/tag/rust-v0.169.0) | 2026-11-13T08:37:05Z | Explicit project trust for exec config/MCP, raw moderation/display and account metadata, optional gateway/settings/history APIs, terminal-error and interruption fixes. |
+| [0.169.1](https://github.com/openai/codex/releases/tag/rust-v0.169.1) | 2026-11-17T22:21:10Z | Sparse notes supplemented with tagged source: Bedrock incremental-tool defaults/commentary normalization and model catalogs. All exec/app-server protocol files match 0.169.0. |
+| [0.170.0](https://github.com/openai/codex/releases/tag/rust-v0.170.0) | 2026-11-18T03:40:48Z | Sandbox/child restrictions, WebSocket fallback, OAuth and Cloud reconnect fixes; optional environment/MCP and TUI realtime features. No new mandatory PHP request fields. |
+
+Stable releases retained from the November 12 review:
+
+| Previously reviewed stable release | Published (UTC) | Relevant assessment |
+| --- | --- | --- |
+| [0.166.0](https://github.com/openai/codex/releases/tag/rust-v0.166.0) | 2026-10-29T19:47:53Z | Preserves acknowledged permissions and reasoning accounting on resume/fork; fixes thread startup/shutdown. Adds flat item timestamps, optional native-dollar usage and metadata. No consumed command/payload removal. |
+| [0.167.0](https://github.com/openai/codex/releases/tag/rust-v0.167.0) | 2026-11-06T01:40:00Z | Managed fresh-human checkpoints require an explicit client capability; unsupported clients reject those commands. Network prompt lifecycle, failed/missing-usage compaction and realtime history fixes ship in the CLI. Optional notification/input/error additions remain tolerated. |
+| [0.167.1](https://github.com/openai/codex/releases/tag/rust-v0.167.1) | 2026-11-10T21:32:01Z | Notes contain only a changelog link. Tagged changes add default-disabled legacy Bedrock incremental tools and related core request/world-state handling. Consumed CLI/protocol schemas are unchanged from 0.167.0. |
+| [0.167.2](https://github.com/openai/codex/releases/tag/rust-v0.167.2) | 2026-11-11T22:44:46Z | Default-enables legacy GCP incremental tool updates; Bedrock's separate flag stays default-disabled. Internal provider request/compaction behavior changes, with consumed exec/app-server contracts unchanged. |
+
+Stable releases retained from the October 27 review:
+
+| Stable release | Published (UTC) | Relevant assessment |
+| --- | --- | --- |
+| [0.164.0](https://github.com/openai/codex/releases/tag/rust-v0.164.0) | 2026-10-23T04:48:10Z | Saved session settings/compressed-history restoration, config/compaction/MCP/sandbox fixes, file-ID image results and optional APIs. |
+| [0.165.0](https://github.com/openai/codex/releases/tag/rust-v0.165.0) | 2026-10-27T20:09:38Z | Vertex AI account/provider, attached forks, conditional defaults, terminal model-not-found errors and MCP cancellation fixes. Previous checkpoint; retained findings remain below. |
 
 Stable release retained from the October 19 review:
 
@@ -169,63 +183,63 @@ The earlier stable-release observations remain relevant historical context:
 
 ## Compatibility findings
 
-### 1. Exec commands, JSONL, images, structured output, and usage: no new required fix
+### 1. Exec commands, JSONL, images, structured output and usage: no new required fix
 
-`ExecTransport::command()` still constructs valid start/resume/fork commands with
-`--json`, model, local images, and output schema. Start-only cwd, sandbox, color,
-and writable-root flags are omitted on resume/fork, which reuse persisted state.
-The [exec CLI arguments](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/exec/src/cli.rs),
-[JSONL event/item declarations](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/exec/src/exec_events.rs),
-and [JSONL emitter](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/exec/src/event_processor_with_jsonl_output.rs)
-have identical Git blobs at **0.163.0, 0.164.0 and 0.165.0**. `Usage::fromArray()`
-and `TurnResultBuilder` consume the retained completion counters. Malformed JSONL
-and process failures keep their typed exception paths. Native 0.165.0 help
-independently confirms emitted argument forms without an authenticated run.
+[`ExecTransport::command()`](../src/Transport/ExecTransport.php) still constructs
+valid start/resume/fork commands with `--json`, model, local images and output
+schema. Start-only cwd, sandbox, color and writable-root flags are omitted on
+resume/fork, which reuse persisted state. The latest
+[exec CLI arguments](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/exec/src/cli.rs)
+add optional `--trust`; existing argument forms are retained. The
+[JSONL declarations](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/exec/src/exec_events.rs)
+have the same Git blob at every compared tag from 0.167.2 through 0.170.0.
+The [JSONL emitter](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/exec/src/event_processor_with_jsonl_output.rs)
+only changes its final-message output-file binding/error propagation in this
+comparison; PHP does not request that file. Its event mappings, final response
+selection and token-counter fields remain. `Usage::fromArray()` and
+`TurnResultBuilder` continue to consume them. Malformed JSONL and process
+failures retain typed exception paths. Native 0.170.0 help accepts consumed
+arguments; no authenticated exec run was made.
 
 Unknown exec events/items become `UnknownEvent`; additional fields survive in
-`raw()`. Existing parser tests exercise this tolerance. Optional web-search
-results and extra item capabilities therefore do not by themselves break parsing.
-Optional `--worktree`, previously reviewed in
-[0.154.0](https://github.com/openai/codex/releases/tag/rust-v0.154.0), and
-`--cyber-access-program` remain unexposed. Their availability does not invalidate
-commands that omit them.
+`raw()`. Parser fixtures cover this tolerance. Optional web-search/image output
+and metadata do not themselves break parsing. Local image and schema inputs
+remain valid; typed generated-image/file-ID handling remains optional. The
+[official non-interactive reference](https://learn.chatgpt.com/docs/non-interactive-mode)
+corroborates JSONL, schema and resume behavior. Calls omitting a model inherit
+CLI/provider defaults; explicit model strings remain accepted. Optional
+`--worktree`, Cyber controls and deliberate trust support are unexposed.
+Finding 13 covers the new project-trust behavior and runtime/default changes.
 
-Callers omitting `model` inherit CLI/provider catalog choices. The CLI catalog
-now offers Terra; explicit model strings remain accepted. Explicit sandbox
-modes and local-image inputs retain their wire forms. Provider/default changes
-and image-generation **output** references are assessed in findings 10–11;
-file-ID results do not change the package's local-image **input** argument.
-The fresh [official non-interactive documentation](https://learn.chatgpt.com/docs/non-interactive-mode)
-corroborates JSONL and output-schema behavior; tagged code controls the
-stable-version conclusions.
+### 2. App-server launch, RPCs, quotas and credits: consumed contracts retained
 
-### 2. App-server launch, RPCs, quotas, and credits: consumed wire contracts retained
+[`JsonRpcConnection::connect()`](../src/AppServer/JsonRpcConnection.php) launches
+`codex app-server --stdio`, accepted by the latest
+[CLI](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/cli/src/main.rs)
+and native help as equivalent to `--listen stdio://`.
+[`AppServerClient`](../src/AppServer/AppServerClient.php) initializes,
+acknowledges `initialized` and sends account, quota/reset-credit, thread
+start/resume/fork and turn start/steer/interrupt methods retained by the
+[RPC registry](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/app-server-protocol/src/protocol/common.rs).
+Consumed fields remain valid; registry/settings/history additions introduce no
+mandatory calls for current workflows.
 
-`JsonRpcConnection::connect()` launches `codex app-server --stdio`. This flag
-remains accepted by the [0.165.0 CLI](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/cli/src/main.rs),
-equivalent to `--listen stdio://`; native help and the
-[official command reference](https://learn.chatgpt.com/docs/developer-commands)
-confirm it. `AppServerClient` initializes and sends account, quota/reset-credit,
-thread start/resume/fork, and turn start/steer/interrupt methods retained by the
-[tagged RPC registry](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/app-server-protocol/src/protocol/common.rs).
-Initialize fields and consumed thread start/resume settings are retained.
+The [account/quota schema](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/app-server-protocol/src/protocol/v2/account.rs)
+adds optional account `userId` and gateway OAuth/security APIs. **Consumed quota,
+credit, reset-credit parameters and all four reset-credit outcomes are unchanged**
+from 0.167.2. This matters because `AppServerTransport` strictly enumerates
+reset-credit outcomes, while `QuotaMapper` accepts additional quota fields and
+preserves them in `Quota::raw`. Generic windows, additional buckets, credit and
+nullable reset-credit details remain mapped. `Account` uses a provider-type
+string and keeps the full original response, including workspace/user metadata.
+The ordinary-usage consumer watch item remains unresolved (finding 7).
+No account/backend or credit-consumption operation was exercised.
 
-The [account/quota/credit schema](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/app-server-protocol/src/protocol/v2/account.rs)
-changes only by adding the `gcp` account variant relative to 0.163.0; **quota,
-credits, reset-credit parameters and all four reset-credit outcomes are unchanged**.
-`QuotaMapper` still maps generic windows, additional buckets, credits, and nullable
-reset-credit details, preserving the response in `Quota::raw`. The explicit-false
-ordinary-usage permission watch item remains unresolved (finding 7).
-`AppServerTransport::account()` accepts the provider type as a string, so the
-new `gcp` variant does not encounter a closed PHP enum. Backend/account access
-and reset-credit consumption were not exercised.
-
-Fork adds default-false experimental controls, including attached forks, which
-this package omits; ordinary forks remain valid (finding 11). New sampling,
-memory-read, diagnostic-export and metadata APIs are optional and are not called.
-No new mandatory server-to-client request method was found. Unknown notifications
-remain `UnknownEvent` with raw payloads. Additional account/model/history metadata
-and optional experimental APIs do not establish required PHP fixes.
+Unknown notifications remain `UnknownEvent` with original raw data. New provider,
+gateway/device-sign-in, account security, environment/settings and history APIs
+are optional. The [official app-server reference](https://learn.chatgpt.com/docs/app-server)
+corroborates initialization, account, quota and reset-credit workflows. Managed
+human-command capability requirements remain as described in finding 12.
 
 ### 3. Resolved: known interactive item translations and original payloads
 
@@ -295,8 +309,8 @@ the existing fake-transport `ThreadTest` retain their behavior.
 
 ### 6. Steering and child-thread handling: prior gap resolved/new local behavior assessed
 
-The previous optional `turn/steer` feature is now implemented in the **working
-tree** by `Thread::steer()`, `SteerableTransport`,
+The previous optional `turn/steer` feature is implemented in the **current
+committed code** by `Thread::steer()`, `SteerableTransport`,
 `AppServerTurnTransport::steer()` / `onTick()`, and `AppServerClient::turnSteer()`.
 Its `threadId`, `expectedTurnId`, text/local-image input, and acknowledged
 `turnId` match the unchanged
@@ -346,7 +360,7 @@ upstream protocol break or proof of every multi-agent workflow.
 The previous missing-permission-handler finding stays **resolved** by commit
 `28a0a29` and the passing `PermissionRequest` / `PermissionResponse` tests. The
 [stable permission schema](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/app-server-protocol/src/protocol/v2/permissions.rs)
-is byte-identical across 0.163.0–0.165.0 (and the prior 0.162.1 check). Interactive thread setup explicitly uses `on-request`, or `never`
+is byte-identical across 0.163.0–0.167.2 (including the intermediate stable tags). Interactive thread setup explicitly uses `on-request`, or `never`
 for full access. Command/file approval decisions and MCP elicitation responses
 still match the consumed contracts; unknown server requests fail visibly.
 
@@ -394,7 +408,7 @@ because upstream exposes them.
   [selects the latest agent message](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/exec/src/event_processor_with_jsonl_output.rs#L387-L403),
   consistent with `TurnResultBuilder::build()`. No new completion or response
   failure is demonstrated. Typed semantic phases and combining/displaying
-  partial answers remain optional product decisions. Current
+  partial answers remain optional product decisions. The previously reviewed
   [official app-server documentation](https://learn.chatgpt.com/docs/app-server)
   lists only commentary/final-answer phases; the newer stable-tag enum is the
   evidence for this finding.
@@ -509,12 +523,12 @@ because upstream exposes them.
   are client internals. Neither establishes a new mandatory JSON-RPC request
   that the PHP connection must answer.
 
-### 11. New 0.164.0–0.165.0 changes and focused impact
+### 11. Retained 0.164.0–0.165.0 changes and focused impact
 
 - **Resume/fork persistence and overrides.**
   [0.164.0](https://github.com/openai/codex/releases/tag/rust-v0.164.0) fixes lookup
   of compressed histories and restores saved model/provider/reasoning settings.
-  The [latest thread processor](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/app-server/src/request_processors/thread_processor.rs)
+  The [previously reviewed thread processor](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/app-server/src/request_processors/thread_processor.rs)
   preserves explicit overrides and restores saved settings when absent. PHP
   `threadParams()` still explicitly sends sandbox/approval settings and any
   selected model; `ExecTransport` omits start-only runtime flags on resume/fork.
@@ -532,7 +546,7 @@ because upstream exposes them.
   member is not a nested wire field. A raw caller that assumes `result` is always
   present must handle file IDs. `NotificationTranslator` does not type
   `imageGeneration`; it returns `UnknownEvent` and preserves the full original
-  item. Both alternatives passed read-only PHP preservation probes. This is an
+  item. Both alternatives passed the November 12 read-only PHP preservation probes. This is an
   optional image-consumer/reference feature gap, not a required wrapper parser
   change. Local input images, structured-output schema requests and exec JSONL
   remain unchanged. Web-search/sleep extension-item blobs are also unchanged.
@@ -543,7 +557,7 @@ because upstream exposes them.
   and [public error classification](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/app-server-protocol/src/protocol/v2/shared.rs)
   add `modelNotFound`; existing failure events/statuses remain. `TurnFailed`,
   `ErrorEvent` and JSON-RPC exceptions retain their error/raw data and do not use
-  a closed PHP error enum. The new failure probe passed. Consumers may classify
+  a closed PHP error enum. The November 12 failure probe passed. Consumers may classify
   this terminal error explicitly to avoid their own pointless retries; no new
   required PHP wire field or argument is established.
 - **Usage and compaction.** The
@@ -586,75 +600,261 @@ because upstream exposes them.
   changes also ship in the CLI. Validate interrupt/cancel behavior in an isolated
   authenticated workflow if those features are used; no such run was performed.
 
+### 12. Retained 0.166.0–0.167.2 changes and focused impact
+
+- **Flat item timestamps and image metadata.** The
+  [0.166.0 item schema](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/app-server-protocol/src/protocol/v2/item.rs)
+  wraps Rust `ThreadItemPayload` with `#[serde(flatten)]` and optional
+  `startedAtMs`/`completedAtMs`. The JSON item still has top-level `type`, `id`,
+  text/status/output and other payload fields. `NotificationTranslator::item()`
+  reads the same fields and the parser keeps the original notification. No PHP
+  `payload` unwrapping is required. The
+  [image-generation extension](https://github.com/openai/codex/blob/rust-v0.167.2/codex-rs/ext/items/src/image_generation.rs)
+  now serializes optional `generationId`; existing `fileId`/`result` alternatives
+  and failure details remain raw. November 12 PHP probes passed for timestamps and
+  both image alternatives. Typed duration/image/correlation support is optional.
+- **Resume/fork settings and reasoning accounting.**
+  [0.166.0](https://github.com/openai/codex/releases/tag/rust-v0.166.0) fixes
+  acknowledged approval/permission restoration and persisted reasoning accounting.
+  [Persisted settings](https://github.com/openai/codex/blob/rust-v0.167.2/codex-rs/app-server/src/request_processors/persisted_resume_settings.rs)
+  prefer owner-known applied settings over stale turn context; the
+  [thread processor](https://github.com/openai/codex/blob/rust-v0.167.2/codex-rs/app-server/src/request_processors/thread_processor.rs)
+  preserves explicit sandbox/profile and approval overrides. PHP interactive
+  `threadParams()` supplies explicit sandbox/approval settings; exec omits those
+  start-only flags on resume/fork. Both existing request styles remain valid.
+  [Reasoning-accounting changes](https://github.com/openai/codex/pull/57839/files)
+  persist whether last usage already includes reasoning, avoiding recounting it
+  on resume/fork. Public consumed token counters are not renamed. The
+  [exec completion backfill](https://github.com/openai/codex/blob/rust-v0.167.2/codex-rs/exec/src/lib.rs#L1749)
+  also recovers terminal items via paginated history under backpressure, inside
+  the CLI; PHP needs no new history RPC. Test saved settings versus explicit
+  overrides, compaction after resumed history and final output under backpressure.
+- **Managed commands requiring a person.**
+  [0.167.0](https://github.com/openai/codex/releases/tag/rust-v0.167.0) introduces
+  managed `requirements.toml` command rules with `decision = "prompt-user"`.
+  The [tagged app-server documentation](https://github.com/openai/codex/blob/rust-v0.167.2/codex-rs/app-server/README.md)
+  requires both `experimentalApi: true` and `requiredHumanApproval: true` before
+  a client can receive `humanCommand` approvals. Without a capable connection,
+  the command is rejected. The
+  [capability schema](https://github.com/openai/codex/blob/rust-v0.167.2/codex-rs/app-server-protocol/src/protocol/v1.rs)
+  defaults the new flag to false; the
+  [exec client](https://github.com/openai/codex/blob/rust-v0.167.2/codex-rs/exec/src/lib.rs)
+  also sets it false. PHP `AppServerClient::initialize()` does not advertise it,
+  so this managed workflow is **not supported by the current wrapper**. Ordinary
+  approval and permission contracts remain usable. Supporting these checkpoints
+  is optional unless deployment policy requires them; it needs a real human
+  presentation path and one-time accept/decline/cancel decisions. Advertising the
+  capability for an automated callback would not fulfill that contract. Validate
+  unsupported rejection and a reviewed human decision if adding support.
+- **Accounts, notifications and input additions.** Nullable `workspaceName` and
+  experimental account-session/GCP setup APIs do not affect current account
+  reads. New `thread/section/changed` notifications are raw `UnknownEvent`.
+  The [turn schema](https://github.com/openai/codex/blob/rust-v0.167.2/codex-rs/app-server-protocol/src/protocol/v2/turn.rs)
+  adds optional names to additional context and a file-ID audio alternative.
+  Uploaded audio file input is explicitly
+  [rejected at runtime in this build](https://github.com/openai/codex/blob/rust-v0.167.2/codex-rs/core/src/session/turn.rs#L1048);
+  schema acceptance does not establish usable audio input. PHP sends neither
+  additional-context nor audio inputs. Local-image/text input, output schemas
+  and steering keep their consumed forms. Richer typed APIs are optional and
+  should be validated for an intended workflow.
+- **Errors and usage metadata.** The
+  [error schema](https://github.com/openai/codex/blob/rust-v0.167.2/codex-rs/app-server-protocol/src/protocol/v2/shared.rs)
+  adds `policyCapacityUnavailable`. `TurnFailed` and `ErrorEvent` retain errors
+  and raw data; the PHP code has no closed error enum to update. A focused November 12
+  failure probe passed. The
+  [thread-usage schema](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/app-server-protocol/src/protocol/v2/thread_usage.rs)
+  adds optional `nativeUsageUsdMicros`, distinct from credit estimates and token
+  counts; missing/null means unknown, not zero. This package does not call that
+  usage-read RPC. Typed billing support is optional. The 0.167.0 compaction fix
+  includes retained output after failed/missing-usage responses; it does not fix
+  PHP's failed/interrupted result-aggregate limitation (finding 10).
+- **Provider tool defaults and CLI runtime upgrades.** Sparse
+  [0.167.1 notes](https://github.com/openai/codex/releases/tag/rust-v0.167.1) were
+  supplemented with the [tag comparison](https://github.com/openai/codex/compare/rust-v0.167.0...rust-v0.167.1):
+  11 changed files, including core tool world state, turn/compaction handling,
+  retained top-level hosted web-search configuration and the default-disabled
+  `incremental_tools_legacy` Bedrock flag. The next
+  [tag comparison](https://github.com/openai/codex/compare/rust-v0.167.1...rust-v0.167.2)
+  changes seven files. Its
+  [feature defaults](https://github.com/openai/codex/blob/rust-v0.167.2/codex-rs/features/src/lib.rs)
+  enable the separate `incremental_tools_legacy_gcp` flag; setting it false opts
+  out, while Bedrock's separate flag stays false. These affect provider request
+  construction, not the wrapper's event/argument contract. Consumed CLI/protocol
+  blobs are identical at 0.167.0/0.167.1/0.167.2. Network prompt lifecycle,
+  realtime-history retention, app-server startup/shutdown, MCP sharing and
+  authentication, model catalogs, standalone packaging and TUI fixes ship in
+  the CLI. No PHP install/upgrade was performed.
+
+### 13. New 0.168.0–0.170.0 changes and focused impact
+
+- **Project trust now stays explicit in exec.**
+  [0.169.0](https://github.com/openai/codex/releases/tag/rust-v0.169.0) corrects
+  implicit project trust under `--sandbox workspace-write`. Untrusted project
+  configuration and MCP servers stay disabled; the command can run with those
+  layers omitted and warning on stderr. The
+  [latest exec implementation](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/exec/src/lib.rs#L551)
+  only persists trust when the caller explicitly requests `--trust` and no saved
+  decision exists; an explicitly untrusted project is refused. The embedded
+  exec app-server uses a default cwd rather than granting trust through explicit
+  thread startup cwd. PHP's existing arguments remain valid, but deployments
+  relying on local config/MCP need a deliberately trusted project. Exposing an
+  explicit trust choice is optional; automatically appending `--trust` would
+  change authority. Interactive PHP still supplies explicit `cwd` under its
+  existing thread-start contract; do not assume its trust path is identical to
+  exec. Validate pretrusted/untrusted directories, warnings, MCP discovery and
+  start/resume/fork using isolated configuration; no real trust was changed.
+- **Message display metadata is preserved, not interpreted.** The
+  [item schema](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/app-server-protocol/src/protocol/v2/item.rs)
+  adds optional agent-message `moderation` with `moderated` and `display`.
+  The [version-1 display contract](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/protocol/src/items/display.rs)
+  describes recovered Chat-answer presentation with `mode: show/hide/block`,
+  annotations, replacement/reason and trusted-contact hints. Unreadable stored
+  display keeps the upstream moderation flag restrictive. `NotificationTranslator`
+  and `JsonlEventParser` preserve the whole original notification; typed
+  `AgentMessage::text` and `TurnResultBuilder` do **not** apply those presentation
+  instructions. This is an optional presentation-support gap for consumers
+  implementing such replay UIs, not a rejected wire payload. Validate raw
+  version-1 show/hide/block, absent display and unknown versions before adding
+  presentation support; retaining text alone does not implement that contract.
+- **Content telemetry is separate from turn usage.**
+  [Item completion](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/app-server-protocol/src/protocol/v2/item.rs)
+  adds nullable `contentTokenCount` for native assistant-content tokens, including
+  a sampled footer. It is completion telemetry, not stored item data or a
+  replacement for `Usage` counters. PHP preserves it raw. Root token-notification
+  and successful-turn reconstruction fields remain; failed/interrupted aggregate
+  accounting still has the limitation in finding 10. Read-only probes confirm
+  display/content fields and `inferenceHookDenied` errors survive translation.
+- **History, account and environment APIs remain optional.** The
+  [thread schema](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/app-server-protocol/src/protocol/v2/thread.rs)
+  adds account-scoped history filtering, attached-thread search, queued-input
+  metadata, prepared-plan handoff and experimental deferred command/MCP history
+  outputs. Deferral requires opt-in; this PHP package calls none of these APIs.
+  Existing start/resume/fork and text/local-image turn inputs remain valid.
+  Thread/turn settings may update environments; these are optional APIs, not
+  required changes to PHP's child-process `env`. Optional account `userId`,
+  gateway/device-sign-in and security notices stay raw or uncalled.
+- **Sandbox, approvals and terminal errors remain usable.**
+  [0.170.0](https://github.com/openai/codex/releases/tag/rust-v0.170.0) fixes
+  permission updates and child threads losing prior restrictions; legacy
+  sandbox/profile conversions and resume overrides are handled in the CLI.
+  The consumed [permission schema](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/app-server-protocol/src/protocol/v2/permissions.rs)
+  and [initialization capabilities](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/app-server-protocol/src/protocol/v1.rs)
+  match 0.167.2. Ordinary command/file/MCP approval callbacks remain applicable;
+  managed human-command restrictions remain unresolved optional support.
+  The [error schema](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/app-server-protocol/src/protocol/v2/shared.rs)
+  adds `inferenceHookDenied`; CLI terminal classification also avoids retrying
+  explicit authentication/workspace/access-program/content-policy denials.
+  PHP retains message/status/structured raw errors without a closed error enum.
+  Validate persisted restrictions across resume/fork, denied actions, terminal
+  failure and cancellation followed by a new turn; upstream runtime fixes do
+  not resolve PHP's failed-turn aggregate-usage gap.
+- **Audio/image and realtime features are optional.**
+  [0.168.0](https://github.com/openai/codex/releases/tag/rust-v0.168.0) enables
+  uploaded recordings for audio-capable models with rejected-recording recovery
+  and duration budgeting. This supersedes the runtime rejection noted for the
+  older 0.167.2 build in finding 12; PHP still sends text/local-image inputs.
+  GIF generation remains feature-gated and default-disabled in the
+  [latest feature source](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/features/src/lib.rs).
+  Generated image/animation payloads remain raw. The
+  [realtime RPC schema](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/app-server-protocol/src/protocol/v2/realtime.rs)
+  is unchanged from 0.167.2; TUI WebRTC negotiation does not require new PHP
+  fields. Neither media backend availability nor a live session was tested.
+- **Sparse patch notes and provider defaults were checked by tag.**
+  [0.169.1 notes](https://github.com/openai/codex/releases/tag/rust-v0.169.1)
+  have no verified highlights. Its
+  [comparison](https://github.com/openai/codex/compare/rust-v0.169.0...rust-v0.169.1)
+  is divergent (four added commits, one behind; 42 changed files), but every
+  exec/app-server protocol file matches 0.169.0. Tagged changes default-enable
+  Bedrock legacy incremental tools, normalize its completed commentary and add
+  GPT-6.2 Sol/Astra catalogs. The
+  [latest features](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/features/src/lib.rs)
+  and [catalog](https://github.com/openai/codex/blob/rust-v0.170.0/codex-rs/models-manager/models.json)
+  retain those defaults/catalog entries. Other new defaults include retained
+  client-tool outputs, unified image budgeting, untrusted context as tool output
+  and Code Mode gRPC/output truncation. PHP accepts model strings and inherits
+  CLI defaults; no new argument or token-counter shape is required.
+- **CLI-only runtime upgrades.** Steering during final transcript flush, saved
+  provider restoration, interruption/late-abort isolation, oversized WebSocket
+  HTTP fallback, MCP OAuth races, Cloud reconnection and Windows runtime fixes
+  ship upstream. New same-name MCP/environment support is experimental.
+  These changes may improve execution but do not by themselves require a PHP
+  release. Native 0.170.0 is already installed; its failing Node/PATH launcher
+  is a separate local environment problem, not a demonstrated protocol break.
+
 ## Actions and focused validation
 
 | Classification | Action and focused validation |
 | --- | --- |
-| **Required new compatibility fixes** | None established for the consumed interfaces through 0.165.0; the prior corrections below remain in the assessed working tree. |
-| **Resolved in working tree: event mappings** | Normalize known app-server command status and object patch kinds; preserve original notification/error payloads. Stable-schema fixtures for known/future statuses, add/delete/update/rename kinds, extra fields, and structured errors pass alongside exec parser tolerance regressions. |
-| **Resolved in working tree: completion** | Interrupted completion now produces `TurnFailed` with upstream status and retained error payload. Completed/failed/interrupted fixtures and an approval-cancel workflow pass. `TurnResult::errors()` communicates non-success; process exit 0 alone remains insufficient. |
-| **Resolved in working tree: interactive fork** | `thread/fork` uses the parent ID and returned child ID; request, configuration, invalid response, and subsequent resume tests pass. A focused authenticated isolated-thread smoke test would still validate inherited history beyond fake RPC assertions. |
-| **Recommended consumer review** | Honor known backend ordinary-usage permission when admitting/retrying turns. Test positive percentages plus explicit `ordinaryUsageAllowed=false`, absent/null values, and sparse updates without erasing complete quota data. |
-| **Recommended delivery/documentation** | Deliver the existing local fixes/features through the normal package release process and document a CLI minimum/range per transport after integration validation. This review identifies no new mandatory code change. Review checkpoints, local installation, and the handshake identifier are not support evidence. The implementation remains uncommitted; no publication was performed. |
-| **Optional feature support** | Expose attached/prediction forks, sampling/memory/diagnostic APIs, file-ID image results and input metadata, voice-session correlation and client-metadata patches only for caller needs. Retain earlier Cyber, semantic-phase/lineage, native-dollar usage, richer-question, file-ID input, worktree/history/routing and realtime watch items. Add focused fixtures when implementing a typed feature; additive schemas and tolerated raw items alone do not require a package release. |
-| **Usage completeness watch item** | For failed-turn cost accounting, consume typed root usage notifications or consider aggregate failure/interruption support. Validate reported counters followed by terminal failure/interruption; zero `TurnResult::usage` does not establish zero spending. |
-| **Focused latest-stable integration checks** | Validate ordinary fork omission of `attachToSource`, compressed-history resume and saved settings versus explicit model/permission overrides; file-ID versus inline image result consumers; terminal `modelNotFound`; failed/interrupted usage and MCP cancellation. Retain immediate/late steering, nested-tool interruption and terminal incomplete-response checks. No authenticated backend checks were run. |
-| **CLI-only upgrades** | New resume/config/compaction fixes, reasoning accounting, MCP auth/cancellation, credential masking, sandbox and marketplace URL hardening, model/provider catalogs, defaults and UI/runtime fixes ship in the CLI. The installed native CLI is already 0.165.0; no upgrade was performed. The PATH Node-launcher failure requires environment investigation if reproduced in deployment, not an inferred PHP compatibility change. |
+| **Required new compatibility fixes** | None established for consumed interfaces through 0.170.0. Retained corrections are present in current committed code. |
+| **Resolved: mappings and completion** | Known command status, object patch kinds, original raw notifications/errors and interrupted status remain covered by passing fixtures. `TurnResult::errors()` communicates non-success; process exit 0 alone remains insufficient. |
+| **Resolved: fork, steering and usage** | Actual `thread/fork` request/child routing, invalid child IDs, subsequent resume, immediate/late steering, child-thread filtering and successful-turn usage reconstruction remain covered by fake-server tests. Validate history/settings inheritance and nested-tool interruption in an isolated live workflow when needed. |
+| **Recommended consumer review** | Honor known backend ordinary-usage permission before admission/retry. Validate positive percentages plus explicit `ordinaryUsageAllowed=false`, absent/null and sparse updates without erasing full quota data. |
+| **Delivery and support-range documentation** | Current fixes are committed after local v1.8.0; deliver through the normal package release process if distributing the tagged artifact. Align numbered changelog/client alias and document a CLI minimum/range per transport after integration validation. No new implementation fix is inferred from tag/version differences alone. |
+| **Optional managed-human workflow** | Add `requiredHumanApproval` only with a real human UI for managed `prompt-user` commands; current exec/PHP clients reject these protected commands without a capable connection. Validate rejection and one-time decisions. Existing automated approval callbacks do not establish this capability. |
+| **Optional typed feature support** | Moderation/display, content-token telemetry, account user IDs and new settings/history APIs can remain raw or uncalled. Item timestamps, workspace/account-session details, native-dollar billing, image generation/file IDs and section notifications can remain raw. Retain attached/prediction forks, sampling/memory/diagnostic APIs, richer questions/plans, semantic phases/lineage, Cyber/worktree/history/routing and realtime watch items. Add targeted validation when implementing a feature. |
+| **Usage completeness watch item** | Consume typed root token updates for failed-turn accounting or consider aggregate failure/interruption support. Validate counters followed by failure/interruption and total deltas against a known baseline; zero aggregate usage does not prove zero spending. |
+| **Focused latest-stable integration checks** | Check explicit project trust and local config/MCP discovery in isolated profiles, moderated replay presentation if used, then persisted approval/permissions versus explicit resume/fork overrides, reasoning accounting across history restoration, flat timed items, terminal policy/model errors and failed usage. For affected deployments, validate GCP incremental tools and optional managed-human rules. No authenticated backend checks were run. |
+| **CLI-only upgrades / environment** | Runtime/auth/sandbox/MCP, provider defaults and TUI changes ship in Codex. Native CLI and npm manifest report 0.170.0; the PATH launcher fails on a missing darwin-x64 optional dependency. Repair/select a working launcher through the normal environment process if needed. No software was installed, upgraded or repaired. |
 
 ## Unresolved uncertainties and limits
 
-- No declared compatibility baseline, enforced range, version tag, or independently
-  verified published PHP artifact was found. The verdict applies to the listed
-  working tree, not an inferred released 1.7.0 artifact.
-- Static schema/source checks and fake-server tests do not certify live turns,
-  forked history, account routing, quotas, reset-credit consumption, approvals,
-  steering latency, or realtime media. No authenticated call or credit redemption
-  was made. The existing schema-based regressions lock down the identified fixes,
-  but passing fake-server tests do not justify a blanket compatibility promise.
-- Interactive usage reconstruction still needs sufficiently complete root token
-  updates. Sparse notifications require caller-side merging/refetching; the
-  package preserves them but cannot manufacture unreported quota sections. Failed
-  or interrupted result aggregates may omit reported spending; the typed usage
-  event stream remains the available accounting evidence (finding 10).
-- Historical 0.157.1 release highlights remain incomplete. The prior verified
+- **No declared compatibility baseline or supported range.** Initial/current
+  requirements, tags and fake CLI versions do not establish a CLI minimum.
+  Latest PHP v1.8.0 predates committed corrections; no published artifact was
+  verified. The verdict concerns current repository code and latest consumed
+  stable interfaces, not every CLI version in the historical review range.
+- Static tag review, native help and fake-server tests do not certify live turns,
+  history/fork restoration, account/provider routing, quotas, reset-credit
+  redemption, approvals, human-command rules, steering latency or realtime.
+  No authenticated API or trust mutation was performed. PATH launcher failure
+  prevents normal default-binary use in this environment; native help succeeds.
+- Ordinary-usage admission in the inspected consumer still ignores backend
+  permission retained in `Quota::raw`. Sparse updates require caller-side
+  merging/refetching. Successful usage reconstruction needs sufficiently complete
+  root updates; failed/interrupted result aggregates may omit reported spending.
+  All these retained limitations persist in unchanged code.
+- Managed human commands are rejected without a capable human client. Typed
+  plans/questions, message phases, moderation/display, content-token/billing/
+  image metadata and optional audio/settings/history APIs remain incomplete
+  feature support. Raw preservation does not implement a recovered-answer UI's
+  display instructions. Schema presence does not prove backend availability.
+- Exec's explicit project-trust requirement can change local config/MCP
+  availability. The wrapper exposes no deliberate `--trust` choice; consumers
+  needing it must establish trust through their normal setup. The review did
+  not authorize or change actual trust. Interactive explicit-cwd and exec
+  embedded-client paths should be checked separately for intended deployments.
+- Historical 0.157.1 highlights remain incomplete; retained
   [tag comparison](https://github.com/openai/codex/compare/rust-v0.157.0...rust-v0.157.1)
-  and this run's tagged consumed-source checks are retained as evidence; brief
-  notes alone were not used to infer support.
-- Source access succeeded for the complete saved/new release inventory and
-  tagged interfaces used here; upstream Git trees were untruncated and fetched
-  source bytes matched Git blob hashes. The API window covers the saved/new
-  range, not all older history. All 34 releases have note-review checkpoints;
-  the current interface reassessment compares 0.163.0, 0.164.0 and 0.165.0 and does not
-  runtime-certify intermediate versions. Baseline uncertainty prevents claims
-  about unreviewed older versions. Reports before October 3 lacked note hashes;
-  the retained hashes now support exact comparisons.
-- The installed native CLI version/help succeeded, but the PATH launcher could not
-  execute its Node interpreter in this environment. No launcher repair, live
-  integration or deployment-specific executable validation was performed.
+  and consumed-source evidence remain. Sparse 0.167.1 and 0.169.1 notes were
+  supplemented by tagged changes; neither sparse notes nor a changelog link
+  alone establish support.
+- The 400-record inventory covers every saved/new stable release, not every
+  older release. Full tree comparisons, selected source reads and blob checks
+  support the consumed-interface findings, not a line-by-line audit of every
+  upstream change. Exploratory source-path 404s were recovered using verified
+  tagged paths; no required source gap remained. This run's detailed comparison
+  is **0.167.2–0.170.0**. Findings 3–12 retain earlier verified observations,
+  reassessed against unchanged package code; their older tagged behavior is
+  historical where explicitly superseded by finding 13.
 
 ## What changed since the previous report
 
-Reviewed **two new stable releases, 0.164.0 and 0.165.0**, published October 23
-and October 27. The reviewed checkpoint advances from 0.163.0 to **0.165.0**.
-All **32** previous note hashes and publication/update timestamps are unchanged;
-the report retains **34** stable releases. New findings cover persisted settings,
-ordinary versus attached forks, file-ID image results, terminal model-not-found
-errors, reasoning accounting, provider/model catalogs, conditional defaults,
-MCP behavior and runtime/security fixes. None establishes a new mandatory PHP
-compatibility fix for consumed interfaces.
+Reviewed **four new stable releases, 0.168.0, 0.169.0, 0.169.1 and 0.170.0**,
+advancing the review checkpoint from 0.167.2 to **0.170.0** (November 18).
+All **38** previous note hashes and publication/update timestamps are unchanged;
+**42** stable releases are now retained. New findings cover explicit exec project
+trust, moderation/display and completion telemetry, account/environment/history
+APIs, enabled uploaded audio, provider/default changes and runtime fixes.
+No new mandatory PHP compatibility fix was established; the verdict remains
+**No update needed for current code**.
 
-The 102 package assessment inputs remain byte-identical to the October 19
-report. Existing fixes and unresolved findings were reassessed; all **144 tests /
-717 assertions** pass, along with focused read-only raw-payload probes. The local
-native CLI now reports **0.165.0**, replacing the local 0.163.0 observation, while
-its PATH launcher could not execute Node. No upgrade or environment repair was
-performed. The three inspected client quota files are unchanged at a newer HEAD;
-sparse merging remains present and ordinary-usage admission remains unresolved.
-
-The verdict remains **No update needed for the assessed working tree**. Existing
-publication/support-range limits, failed-turn accounting, optional features,
-consumer recommendations and authenticated-runtime uncertainties remain. No
-supported baseline or published-package certification is inferred.
+Package HEAD, its 102-file fingerprint and the relevant consumer checkout are
+unchanged. All **144 tests / 717 assertions** pass, with focused read-only raw
+payload probes. Installed native CLI is now **0.170.0**; its help probes pass,
+but the PATH launcher currently fails on a missing optional dependency,
+superseding the previous working-launcher observation. No repair was made.
+Existing quota-admission, sparse-state, failed-turn usage, human-command,
+optional presentation and delivery/baseline findings are retained.
 
 ## Checkpoint for subsequent runs
 
@@ -712,3 +912,11 @@ They are comparison snapshots, not support certifications.
 | [0.163.0](https://github.com/openai/codex/releases/tag/rust-v0.163.0) | 2026-10-15T21:30:38Z | 2026-10-15T21:33:06Z | `0d6ae6535419b1984583879b4e07387ab4a91498efa52e3dd697a859de82055e` |
 | [0.164.0](https://github.com/openai/codex/releases/tag/rust-v0.164.0) | 2026-10-23T04:48:10Z | 2026-10-23T04:50:58Z | `49fc34aefdff50ddbab91f710d39eafbd1ac1167ba8ac186fdd34211addadd1c` |
 | [0.165.0](https://github.com/openai/codex/releases/tag/rust-v0.165.0) | 2026-10-27T20:09:38Z | 2026-10-27T20:11:49Z | `ca2487ca0ed88cd77d499a2d7ea9bbf82880707bde94a79ca7d7958aa615fd0f` |
+| [0.166.0](https://github.com/openai/codex/releases/tag/rust-v0.166.0) | 2026-10-29T19:47:53Z | 2026-10-29T19:50:20Z | `f67845b2d634b8679cdb4ac0ded4533471d76391bc8a90df2a01f59586168666` |
+| [0.167.0](https://github.com/openai/codex/releases/tag/rust-v0.167.0) | 2026-11-06T01:40:00Z | 2026-11-06T01:42:19Z | `1c954a1b3521436a10c1bd5b8c2951db4dee4fad4c1a0e911dfd72ee8ed1bf4f` |
+| [0.167.1](https://github.com/openai/codex/releases/tag/rust-v0.167.1) | 2026-11-10T21:32:01Z | 2026-11-10T21:33:57Z | `cc8c16e1701844ff9d66848dae004ee68155a77a6000f98e93ff4987f32b5d54` |
+| [0.167.2](https://github.com/openai/codex/releases/tag/rust-v0.167.2) | 2026-11-11T22:44:46Z | 2026-11-11T22:46:17Z | `dfac3dca97f82dc5a09577eb6ed163ef6eabb877e866cd905701535a9302146f` |
+| [0.168.0](https://github.com/openai/codex/releases/tag/rust-v0.168.0) | 2026-11-13T03:54:29Z | 2026-11-13T03:56:26Z | `2d98ba4e26fdf59040bb3d9accf2e7f4e85932e92ee03071f22a4c452df10b39` |
+| [0.169.0](https://github.com/openai/codex/releases/tag/rust-v0.169.0) | 2026-11-13T08:37:05Z | 2026-11-13T08:39:10Z | `d6cbab2b561d631d647a60f3c6fd7ae3d3f4a5a4c53243fdb35a63b9296a94e3` |
+| [0.169.1](https://github.com/openai/codex/releases/tag/rust-v0.169.1) | 2026-11-17T22:21:10Z | 2026-11-17T22:22:49Z | `0b23a867b21b990f3cede569e3f9b22ecdaa606dc817784c61d5f05686127eb7` |
+| [0.170.0](https://github.com/openai/codex/releases/tag/rust-v0.170.0) | 2026-11-18T03:40:48Z | 2026-11-18T03:45:39Z | `b3de3d55463e2d7b52e559fedd576e416b977389752595d9072aaa64210249ed` |
